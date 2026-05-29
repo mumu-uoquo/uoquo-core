@@ -1,145 +1,308 @@
-# 简介
-本项目包主要用于定义基础类、全局异常处理、全局拦截器等
+# app-core
 
-# 目录结构
-```bat
+单体应用核心模块，提供统一的请求处理链路：过滤器 → 拦截器 → 参数签名校验 → 统一异常处理 → 统一响应格式。同时集成 MyBatis 增强、Redis 缓存、事件系统等基础能力。
+
+依赖 `utils-basic`（自动传递 `uoquo-annotations`）。
+
+---
+
+## 包结构
+
+```
 com.uoquo.web
-|- base 
-|- cache  
-|- common  
-|- controller  
-|  |- AppVersionController `获取应用的版本号`
-|  |_ GlobalExceptionController
-|
-|- filter
-|  |- LogbackFilter 定义全局请求ID
-|  |_ MultiReadHttpServletRequestFilter 复用请求流
-|
-|- interceptor
-|- mybatis
-|- servlet
-|  |_ CaptchaImageServlet 验证码
-|
-|- ServiceApplication
-|_ ServiceConfig  基础配置类
-
+├── ServiceApplication.java              # 应用启动基类
+├── ServiceAutoConfiguration.java        # 自动配置（注入各组件）
+├── ServiceConfig.java                   # 基础配置（OkHttp 连接池等）
+│
+├── config/
+│   ├── EventConfig.java                 # 事件系统配置
+│   ├── MyBatisPluginConfig.java         # MyBatis 插件注册
+│   ├── RedisConfig.java                 # Redis 连接配置
+│   ├── RedisConfigProperties.java       # Redis 配置属性
+│   ├── TaskSchedulerConfig.java         # 任务调度配置
+│   ├── WebFilterConfig.java             # 过滤器注册
+│   └── WebHttpConfig.java               # MVC 配置（拦截器、消息转换器）
+│
+├── controller/
+│   ├── AppVersionController.java        # 应用版本号接口
+│   ├── GlobalExceptionController.java   # 404 等未捕获异常处理
+│   ├── GlobalExceptionHandler.java      # @ControllerAdvice 异常处理
+│   └── GlobalExceptionResolver.java     # HandlerExceptionResolver 实现
+│
+├── events/
+│   ├── AppEvent.java                    # 应用事件（含业务元数据）
+│   ├── AppEventListenerAdapter.java     # 事件监听适配器（异步执行）
+│   ├── AppEventListenerFactory.java     # 事件监听工厂
+│   ├── UoquoEvent.java                  # 基础事件定义
+│   ├── UoquoEventListenerFactory.java   # 事件工厂
+│   └── UoquoEventPublisher.java         # 事件发布器
+│
+├── filter/
+│   ├── ContentCachingWrapperFilter.java        # 请求体缓存包装
+│   ├── LogbackFilter.java                      # 日志 MDC（请求 TraceId）
+│   └── RepeatedlyHttpServletRequestWrapper.java # 可重复读取请求体
+│
+├── interceptor/
+│   ├── CurrentUserInterceptorAdapter.java  # 用户信息提取（最高优先级）
+│   ├── CurrentUser4TokenInterceptor.java   # Token 模式用户信息
+│   ├── CurrentUser4SessionInterceptor.java # Session 模式用户信息
+│   ├── GlobalInterceptor.java              # 全局拦截（日志、参数解析）
+│   ├── CheckParamInterceptor.java          # 参数签名校验
+│   └── CheckLoginInterceptor.java          # 登录状态校验
+│
+├── mybatis/
+│   ├── handler/                         # 类型处理器
+│   │   ├── DateTypeHandler.java         # 日期类型
+│   │   ├── List2JsonTypeHandler.java    # List ↔ JSON
+│   │   └── Map2JsonTypeHandler.java     # Map ↔ JSON
+│   ├── interceptor/                     # MyBatis 拦截器
+│   │   ├── PageInterceptor.java         # 分页拦截器
+│   │   ├── DataPolicyInterceptor.java   # 数据权限拦截器
+│   │   ├── SensitiveParameterInterceptor.java   # 入库加密
+│   │   ├── SensitiveResultSetInterceptor.java   # 出库解密
+│   │   └── SqlCostInterceptor.java      # SQL 耗时监控
+│   ├── page/                            # 分页实现
+│   │   ├── PageHelper.java              # 分页入口
+│   │   ├── Dialect.java                 # 方言接口
+│   │   ├── MSUtils.java                 # MappedStatement 工具
+│   │   └── dialect/                     # 方言实现
+│   │       ├── MySQLDialect.java
+│   │       └── OracleDialect.java
+│   ├── sensitive/                       # 敏感数据处理
+│   │   ├── SensitiveUtil.java           # 加解密工具
+│   │   └── MapperMethodResolver.java    # Mapper 方法解析（带缓存）
+│   ├── sharding/                        # 分表
+│   │   ├── TableShardInterceptor.java   # 分表拦截器
+│   │   └── MonthTableShardStrategy.java # 按月分表策略
+│   └── sqlparser/                       # SQL 解析
+│       ├── SqlDeParser.java             # SQL 反解析器
+│       └── TableAliasDeParser.java      # 表别名解析
+│
+└── utils/
+    └── WebUtil.java                     # Web 工具（签名计算、IP 获取等）
 ```
 
 ---
 
-# 请求参数签名校验
-
-## 概述
-
-为保证请求参数在传输过程中不被篡改，系统采用 MD5 签名机制对请求进行完整性校验。
-签名校验在 `CheckParamInterceptor` 拦截器中执行，校验顺序为：时间戳校验 → 防重提交校验 → 参数签名校验。
-
-## 请求头参数
-
-客户端发起请求时，需在请求头（或URL参数）中传入以下内置参数：
-
-| 参数名             | 常量                          | 说明        | 必填 |
-|:----------------|:----------------------------|:----------|:--:|
-| `appid`         | `CurrentUser.APPID`         | 应用ID      | 是  |
-| `token`         | `CurrentUser.TOKEN`         | 授权令牌      | 是  |
-| `nonce`         | `CurrentUser.NONCE`         | 请求随机数（防重） | 是  |
-| `timestamp`     | `CurrentUser.TIME`          | 请求时间戳（毫秒） | 是  |
-| `device-id`     | `CurrentUser.DEVICE_ID`     | 设备唯一标识    | 是  |
-| `user-language` | `CurrentUser.USER_LANGUAGE` | 客户端语言     | 是  |
-| `signature-app` | `CurrentUser.SIGN_APP`      | 请求签名值     | 是  |
-
-> 注：参数优先从请求头获取，若请求头中不存在，则从URL参数或Form-Data中获取（兼容SSE等无法添加Header的场景）。
-
-## 签名计算规则
-
-签名由 `WebUtil.signParam()` 计算得出，最终调用 `SignParamUtil.sign()` 执行 MD5 摘要。
-拼接顺序如下：
+## 请求处理链路
 
 ```
-MD5( appid + token + language + nonce + deviceId + timestamp + 请求参数 + 请求体 + secret )
+HTTP 请求
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ Filter 层                            │
+│  LogbackFilter → 生成 TraceId        │
+│  ContentCachingWrapperFilter → 缓存请求体 │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ Interceptor 层（按优先级顺序）        │
+│  1. CurrentUserInterceptorAdapter    │
+│     → 提取用户信息到 ThreadLocal      │
+│  2. GlobalInterceptor                │
+│     → 请求日志、TraceId、参数解析     │
+│  3. CheckParamInterceptor            │
+│     → 时间戳 → 防重 → 签名校验       │
+│  4. CheckLoginInterceptor            │
+│     → Token 有效性校验               │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ Controller 层                        │
+│  业务逻辑处理                        │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ Exception Handler                    │
+│  GlobalExceptionHandler              │
+│  → 所有异常统一返回 ReturnData       │
+│  → HTTP 状态码始终 200               │
+└─────────────────────────────────────┘
 ```
-
-### 1. 内置参数拼接
-
-按固定顺序依次拼接各内置参数的值（非空时拼接）：
-
-| 顺序 | 参数        | 取值来源        |
-|:--:|:----------|:------------|
-| 1  | appid     | 请求头 / URL参数 |
-| 2  | token     | 请求头 / URL参数 |
-| 3  | language  | 请求头 / URL参数 |
-| 4  | nonce     | 请求头 / URL参数 |
-| 5  | deviceId  | 请求头 / URL参数 |
-| 6  | timestamp | 请求头 / URL参数 |
-
-### 2. 请求参数拼接
-
-取 `request.getParameterMap()` 中的所有参数，按 key 的字典序（TreeMap）排列后逐项拼接：
-
-```
-key1 + value1 + key2 + value2 + ...
-```
-
-**注意：** 以下内置参数已通过请求头单独参与签名，在请求参数遍历时会被跳过，不重复计算：
-`appid`、`token`、`nonce`、`timestamp`、`device-id`、`user-language`、`signature-app`
-
-多值参数的处理：
-- `null` → 直接拼接 key
-- 空数组 → key + ""
-- 单值 → key + value
-- 多值 → key + JSON序列化结果（`JsonUtil.serialize(vals)`）
-
-### 3. 文件上传
-
-当请求为 `multipart/form-data` 时：
-- 文件内容本身不参与签名计算
-- 但必须以**文件原始名称**为 key，传入该文件的 **MD5 值**作为请求参数
-- 若未传入文件对应的 MD5，将抛出 `IllegalArgumentException`
-
-### 4. 请求体拼接
-
-当 Content-Type **不是** `multipart/form-data` 或 `application/octet-stream` 时，读取请求体的原始字节参与签名。
-
-> 注：Spring 会将 form 表单和文件内容解析到 `parameterMap` 和 `MultipartFile` 中，此时请求体为空，不会重复计算。
-
-### 5. 密钥拼接
-
-最后拼接应用密钥 `secret`，然后对整体内容进行 MD5 摘要，得到签名值。
-
-## 校验流程
-
-`CheckParamInterceptor` 在 `CurrentUser` 拦截器之后执行，流程如下：
-
-```
-请求进入
-  │
-  ├─ OPTIONS 请求 → 放行
-  ├─ @IgnoreAuth(all=true) → 跳过所有校验
-  ├─ 全局免签路径（Redis 配置） → 跳过校验
-  ├─ FEIGN 内部调用 → 跳过校验
-  │
-  └─ 依次执行：
-      1. 时间戳校验（@IgnoreAuth(timestamp=true) 可跳过）
-         - 请求时间戳与服务器时间差超过5分钟则拒绝
-      2. 防重提交校验
-         - 以 appid + nonce 为键，5分钟内不可重复提交
-      3. 参数签名校验（@IgnoreAuth(params=true) 可跳过）
-         - 校验 appid、signature-app、language、nonce、device-id 不为空
-         - 用 WebUtil.signParam() 重新计算签名，与传入的 signature-app 比对
-```
-
-## 免签注解 @IgnoreAuth
-
-| 属性                   |  默认值  | 说明                                  |
-|:---------------------|:-----:|:------------------------------------|
-| `all`                | false | 忽略所有校验（慎用）                          |
-| `timestamp`          | false | 忽略时间戳校验（适用于设备与服务器时间不同步的场景）          |
-| `params`             | false | 忽略参数签名校验                            |
-| `login`              | false | 忽略登录校验                              |
-| `inner`              | false | 标记为内部接口，仅允许 FEIGN 调用                |
-| `refreshExpiresTime` | true  | 是否刷新 token 过期时间（对于定时轮询接口一般标记为false） |
 
 ---
 
+## 请求签名校验
 
-默认采用读写分离模式
+### 签名计算规则
+
+```
+签名 = MD5(appid + token + language + nonce + deviceId + timestamp + 请求参数 + 请求体 + secret)
+```
+
+### 请求头参数
+
+| 参数名 | 说明 | 必填 |
+|--------|------|:----:|
+| `appid` | 应用 ID | 是 |
+| `token` | 授权令牌 | 是 |
+| `nonce` | 请求随机数（防重放） | 是 |
+| `timestamp` | 请求时间戳（毫秒） | 是 |
+| `device-id` | 设备唯一标识 | 是 |
+| `user-language` | 客户端语言 | 是 |
+| `signature-app` | 请求签名值 | 是 |
+
+### 请求参数拼接规则
+
+1. 取 `request.getParameterMap()` 所有参数
+2. 按 key 字典序排列（TreeMap）
+3. 逐项拼接：`key1 + value1 + key2 + value2 + ...`
+4. 内置参数（appid / token / nonce 等）已单独参与，遍历时跳过
+
+### 文件上传签名
+
+- 文件内容不参与签名
+- 必须传入文件原始名称为 key，文件 MD5 为 value
+
+### 校验流程
+
+```
+1. OPTIONS 请求 → 直接放行
+2. @IgnoreAuth(all=true) → 跳过所有校验
+3. 全局免签路径（Redis 配置） → 跳过
+4. FEIGN 内部调用 → 跳过
+
+依次执行：
+├── 时间戳校验：请求时间与服务器相差超过 5 分钟则拒绝
+├── 防重提交：appid + nonce 为键，5 分钟内不可重复
+└── 参数签名：重新计算签名与 signature-app 比对
+```
+
+---
+
+## MyBatis 增强
+
+### 分页
+
+基于 jsqlparser 改写 SQL，对业务代码零侵入：
+
+```java
+// Service 中使用
+PageHelper.startPage(pageNum, pageSize);
+PageList<User> users = userMapper.selectByCondition(params);
+return PageResult.of(users);
+
+// 模糊分页（不执行 COUNT 查询，性能更优）
+PageHelper.startPage(pageNum, pageSize, false);
+```
+
+支持方言：MySQL、Oracle
+
+### 敏感数据加解密
+
+在实体类和 Mapper 方法上使用注解，MyBatis 拦截器自动完成加解密：
+
+```java
+// 实体类标注
+@SensitiveData
+public class Patient {
+    @SensitiveField
+    private String idCard;
+    @SensitiveField
+    private String phone;
+}
+
+// Mapper 方法标注（用于返回 String 时）
+@SensitiveData
+String selectPhone(@Param("id") String id);
+```
+
+加密时机：`SensitiveParameterInterceptor`（Executor.update / Executor.query 前）
+解密时机：`SensitiveResultSetInterceptor`（ResultSetHandler.handleResultSets 后）
+
+### SQL 耗时监控
+
+`SqlCostInterceptor` 记录每条 SQL 的执行耗时，超过阈值时输出 WARN 日志。
+
+### 分表
+
+```java
+@TableShardAnnotation(
+    tableName = "t_log",
+    shardStrategy = MonthTableShardStrategy.class,
+    lastMonth = false
+)
+List<Log> selectLogs(@Param("userId") String userId);
+```
+
+`MonthTableShardStrategy` 按当前月份生成表名后缀，如 `t_log_202401`。
+
+---
+
+## 事件系统
+
+### 发布事件
+
+```java
+@Autowired
+UoquoEventPublisher eventPublisher;
+
+AppEvent event = new AppEvent();
+event.setBusinessType("USER");
+event.setOperationType("CREATE");
+event.setOperatorId(CurrentUser.getUserId());
+event.setData(user);
+eventPublisher.publish(event);
+```
+
+### 监听事件
+
+```java
+@UoquoEvent
+public void onUserCreated(AppEvent event) {
+    // 异步执行
+}
+```
+
+---
+
+## 统一异常处理
+
+三层保障机制：
+
+1. **`GlobalExceptionHandler`**（@ControllerAdvice）— 捕获 Controller 层异常
+2. **`GlobalExceptionController`**（ErrorController）— 捕获 404 等 Servlet 异常
+3. **`GlobalExceptionResolver`**（HandlerExceptionResolver）— 兜底处理
+
+所有异常统一包装为 `ReturnData`，生产环境只返回 traceId 不返回堆栈。
+
+---
+
+## 配置项
+
+### Redis
+
+```yaml
+app:
+  redis:
+    enabled: true           # 是否启用 Redis
+    database: 0
+    host: localhost
+    port: 6379
+    password: xxx
+    timeout: 3000
+```
+
+### MyBatis 插件
+
+```yaml
+app:
+  mybatis:
+    page: true              # 分页插件
+    sensitive: true         # 敏感数据加解密
+    sqlcost: true           # SQL 耗时监控
+    sharding: true          # 分表插件
+```
+
+### 任务调度
+
+```yaml
+app:
+  task:
+    pool:
+      max-size: 10          # 线程池最大线程数
+```
