@@ -1,0 +1,1120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.uoquo</groupId>
+  <artifactId>dependencies</artifactId>
+  <version>1.1.0</version>
+  <packaging>pom</packaging>
+  <description>定义各个依赖包版本</description>
+
+  <organization>
+    <name>uoquo</name>
+    <url>http://www.uoquo.com</url>
+  </organization>
+
+  <!-- 参数定义，主要定义常用jar的版本信息，便于升级维护 -->
+  <properties>
+    <uoquo.version>1.1.0</uoquo.version>
+    <!-- 版本信息，子类中将会继承引用 -->
+    <PublicRepository>https://mvn.uoquo.com/repository/maven-public/</PublicRepository>
+    <ReleaseRepository>https://mvn.uoquo.com/repository/maven-releases/</ReleaseRepository>
+    <SnapshotRepository>https://mvn.uoquo.com/repository/maven-snapshots/</SnapshotRepository>
+    <!-- maven编译的JDk环境 -->
+    <java.version>21</java.version>
+    <maven.compiler.source>${java.version}</maven.compiler.source>
+    <maven.compiler.target>${java.version}</maven.compiler.target>
+    <maven.compiler.compilerVersion>${java.version}</maven.compiler.compilerVersion>
+    <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
+    <maven.test.skip>true</maven.test.skip>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- 其他依赖包版本 -->
+    <!-- SpringBoot 2.x : jdk 1.8 -->
+    <!-- SpringBoot 3.x : jdk 17  -->
+    <!-- https://spring.io/projects/spring-cloud -->
+    <!-- https://github.com/spring-cloud/spring-cloud-release/wiki/Supported-Versions -->
+    <!-- https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-dependencies -->
+    <spring.cloud.version>2025.0.2</spring.cloud.version>
+    <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-dependencies -->
+    <spring.boot.version>3.5.14</spring.boot.version>
+
+    <!-- https://github.com/alibaba/spring-cloud-alibaba/wiki/版本说明 -->
+    <!-- https://github.com/alibaba/spring-cloud-alibaba/wiki/Sentinel -->
+    <!-- https://mvnrepository.com/artifact/com.alibaba.cloud -->
+    <alibaba.version>2025.0.0.0</alibaba.version>
+    <!-- https://nacos.io -->
+    <!-- https://mvnrepository.com/artifact/com.alibaba.nacos/nacos-client -->
+    <nacos.version>2.4.3</nacos.version>
+    <!-- https://seata.apache.org -->
+    <!-- https://mvnrepository.com/artifact/org.apache.seata/seata-spring-boot-starter -->
+    <seata.version>2.6.0</seata.version>
+    <!-- https://github.com/alibaba/druid/releases -->
+    <!-- https://mvnrepository.com/artifact/com.alibaba/druid-spring-boot-starter -->
+    <druid.version>1.2.28</druid.version>
+
+    <!-- https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api -->
+    <servlet.javax>4.0.1</servlet.javax>
+    <!-- https://mvnrepository.com/artifact/jakarta.servlet/jakarta.servlet-api -->
+    <servlet.jakarta>6.1.0</servlet.jakarta>
+    <!-- https://mvnrepository.com/artifact/jakarta.validation/jakarta.validation-api -->
+    <validate.jakarta>3.1.1</validate.jakarta>
+    <validate.hibernate>8.0.2.Final</validate.hibernate>
+    <!-- https://mvnrepository.com/artifact/jakarta.annotation/jakarta.annotation-api -->
+    <annotation.jakarta>3.0.0</annotation.jakarta>
+
+    <!-- https://mvnrepository.com/artifact/org.json/json -->
+    <json.version>20251224</json.version>
+    <!-- https://mvnrepository.com/artifact/com.google.code.gson/gson -->
+    <gson.version>2.11.0</gson.version>
+    <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
+    <!-- jackson 版本由 spring-boot-dependencies BOM 管理 -->
+    <!-- <jackson.version>2.18.3</jackson.version> -->
+    <!-- https://mvnrepository.com/artifact/com.alibaba/fastjson -->
+    <fastjson.version>2.0.56</fastjson.version>
+    <!-- https://mvnrepository.com/artifact/org.dom4j/dom4j -->
+    <dom4j.version>2.1.1</dom4j.version>
+
+    <!-- https://mvnrepository.com/artifact/com.h2database/h2 -->
+    <h2.version>2.4.240</h2.version>
+    <!-- 推荐：https://mvnrepository.com/artifact/com.mysql/mysql-connector-j -->
+    <mysql-j.version>9.7.0</mysql-j.version>
+    <!-- https://mvnrepository.com/artifact/mysql/mysql-connector-java -->
+    <!-- com.mysql.cj.jdbc.Driver : 8.0.33 -->
+    <!-- com.mysql.jdbc.Driver    : 5.1.48 -->
+    <mysql.version>8.0.33</mysql.version><!-- seata必须使用mysql5.1.48以上 -->
+    <!-- https://mybatis.org/spring-boot-starter/mybatis-spring-boot-autoconfigure/ -->
+    <!-- https://mvnrepository.com/artifact/org.mybatis.spring.boot -->
+    <mybatis-sboot.version>3.0.5</mybatis-sboot.version>
+    <!-- https://mvnrepository.com/artifact/org.mybatis -->
+    <mybatis-spring.version>3.0.5</mybatis-spring.version>
+    <mybatis.version>3.5.19</mybatis.version>
+    <!-- https://mvnrepository.com/artifact/com.github.jsqlparser/jsqlparser -->
+    <jsqlparser.version>5.3</jsqlparser.version>
+
+    <!-- https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp -->
+    <okhttp3.version>4.12.0</okhttp3.version>
+    <!-- https://mvnrepository.com/artifact/com.google.zxing/core -->
+    <zxing.version>3.5.2</zxing.version>
+    <!-- https://mvnrepository.com/artifact/org.ehcache/ehcache -->
+    <ehcache.version>3.8.1</ehcache.version>
+    <!-- https://mvnrepository.com/artifact/jakarta.mail/jakarta.mail-api -->
+    <mail.jakarta>2.1.5</mail.jakarta>
+
+    <!-- https://mvnrepository.com/artifact/com.itextpdf -->
+    <itext.version>7.1.10</itext.version>
+    <!-- https://mvnrepository.com/artifact/org.apache.poi -->
+    <poi.version>4.1.2</poi.version>
+    <!-- https://mvnrepository.com/artifact/org.yaml/snakeyaml -->
+    <yaml.version>2.0</yaml.version>
+
+    <!-- https://mvnrepository.com/artifact/io.swagger.core.v3/swagger-annotations -->
+    <swagger-v3.version>2.2.49</swagger-v3.version>
+    <!-- https://mvnrepository.com/artifact/io.springfox/springfox-boot-starter -->
+    <!-- spring boot 2.5.x 之前可以用 springfox -->
+    <springfox.version>3.0.0</springfox.version>
+    <!-- 推荐：https://springdoc.org -->
+    <!-- https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-starter-webmvc-ui -->
+    <!-- 1.8.0: spring 1.x、spring 2.x -->
+    <!-- 2.8.4: spring 3.x -->
+    <springdoc.version>2.8.17</springdoc.version>
+
+    <!-- https://mvnrepository.com/artifact/io.netty/netty-all -->
+    <netty.version>4.2.14.Final</netty.version>
+
+    <!-- https://mvnrepository.com/artifact/org.slf4j -->
+    <slf4j.version>2.0.18</slf4j.version>
+    <!-- https://mvnrepository.com/artifact/ch.qos.logback/logback-classic -->
+    <logback.version>1.5.32</logback.version>
+  </properties>
+
+  <!-- 仓库信息，用于查找jar（注意仓库id与settings.xml中server的id一致） -->
+  <repositories>
+    <repository>
+      <id>xuziu-mvn-reader</id>
+      <name>Team Nexus jar Repository</name>
+      <url>${PublicRepository}</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>xuziu-mvn-reader</id>
+      <name>Team Nexus plugin Repository</name>
+      <url>${PublicRepository}</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+
+  <!-- 分发管理，主要用于maven打包发布（注意仓库id与settings.xml中server的id一致） -->
+  <distributionManagement>
+    <repository>
+      <id>xuziu-mvn-deploy</id>
+      <name>Team Release Repository</name>
+      <url>${ReleaseRepository}</url>
+    </repository>
+    <snapshotRepository>
+      <id>xuziu-mvn-reader</id>
+      <name>Team Snapshot Repository</name>
+      <url>${SnapshotRepository}</url>
+      <uniqueVersion>false</uniqueVersion>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <!-- 项目必须引入的jar包 -->
+  <dependencies>
+    <!-- =================== log相关 =================== -->
+    <!-- 使用 spring-boot-starter-logging 统一管理日志依赖（logback + slf4j bridges），
+         版本由 spring-boot-dependencies BOM 管理，避免手动指定版本导致的冲突 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-logging</artifactId>
+      <version>${spring.boot.version}</version>
+    </dependency>
+    <!-- =================== 测试相关 =================== -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <version>${spring.boot.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <!-- 声明依赖jar，不会被引入，需在实际pom中手动引入dependency -->
+  <dependencyManagement>
+    <dependencies>
+      <!-- =================== spring boot =================== -->
+      <!-- spring boot 不以parent的方式引入，
+         - 详情 https://docs.spring.io/spring-boot/docs/current/reference/html/using-boot-build-systems.html#using-boot-maven-without-a-parent
+         - 使用scope=import的方式实现多继承parent pom的模式
+         - -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring.boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- 引入spring boot，排除内置容器，方便导出后可以部署到外部容器中，开发时可以引入内部容器相关包 -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+        <version>${spring.boot.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
+      <!-- =================== spring cloud =================== -->
+      <!-- 版本 https://spring.io/projects/spring-cloud#learn -->
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring.cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Spring Cloud 组件（openfeign、loadbalancer、context 等）版本由上方 BOM 统一管理，
+           子项目按需在 <dependencies> 中引入即可，无需指定版本 -->
+      <!-- bootstrap 支持在 Spring Cloud 2025.0.x 中已从 BOM 移除，需显式指定版本 -->
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-bootstrap</artifactId>
+        <version>4.3.2</version>
+      </dependency>
+      <!-- 熔断：hystrix 已在 Spring Cloud 2020+ 移除，使用 Spring Cloud Circuit Breaker 替代 -->
+      <!-- 如需熔断功能，请使用 spring-cloud-starter-circuitbreaker-resilience4j -->
+      <!--
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+        <version>3.2.2</version>
+      </dependency>
+      -->
+
+      <!-- =================== alibaba =================== -->
+      <!--
+        - https://github.com/alibaba/spring-cloud-alibaba/wiki/版本说明
+        - https://nacos.io/zh-cn/docs/quick-start-spring-cloud.html
+      -->
+      <dependency>
+        <groupId>com.alibaba.cloud</groupId>
+        <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+        <version>${alibaba.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- nacos-client 版本覆盖（如需与 alibaba BOM 不同版本时使用） -->
+      <dependency>
+        <groupId>com.alibaba.nacos</groupId>
+        <artifactId>nacos-client</artifactId>
+        <version>${nacos.version}</version>
+      </dependency>
+      <!-- seata -->
+      <!-- https://seata.apache.org/docs/ops/upgrade -->
+      <dependency>
+        <groupId>org.apache.seata</groupId>
+        <artifactId>seata-all</artifactId>
+        <version>${seata.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.seata</groupId>
+        <artifactId>seata-spring-boot-starter</artifactId>
+        <version>${seata.version}</version>
+      </dependency>
+      <!-- druid -->
+      <!-- Spring Boot 3.x 使用 druid-spring-boot-3-starter -->
+      <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>druid-spring-boot-3-starter</artifactId>
+        <version>${druid.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>druid-spring-boot-starter</artifactId>
+        <version>${druid.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>druid</artifactId>
+        <version>${druid.version}</version>
+      </dependency>
+
+      <!-- =================== apache =================== -->
+      <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-compress -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+        <version>1.28.0</version>
+      </dependency>
+      <!-- Source: https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.20.0</version>
+      </dependency>
+
+      <!-- =================== other =================== -->
+      <!-- netty -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-all</artifactId>
+        <version>${netty.version}</version>
+      </dependency>
+
+      <!-- okhttp3 -->
+      <dependency>
+        <groupId>com.squareup.okhttp3</groupId>
+        <artifactId>okhttp</artifactId>
+        <version>${okhttp3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okhttp3</groupId>
+        <artifactId>logging-interceptor</artifactId>
+        <version>${okhttp3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okhttp3</groupId>
+        <artifactId>mockwebserver</artifactId>
+        <version>${okhttp3.version}</version>
+        <scope>test</scope>
+      </dependency>
+
+      <!-- servlet -->
+      <dependency>
+        <groupId>javax.servlet</groupId>
+        <artifactId>javax.servlet-api</artifactId>
+        <version>${servlet.javax}</version>
+      </dependency>
+      <!-- 以下 jakarta/jackson/hibernate-validator 版本由 spring-boot-dependencies BOM 管理 -->
+      <!-- 如需覆盖，取消注释并指定版本 -->
+      <!--
+      <dependency>
+        <groupId>jakarta.servlet</groupId>
+        <artifactId>jakarta.servlet-api</artifactId>
+        <version>${servlet.jakarta}</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.validation</groupId>
+        <artifactId>jakarta.validation-api</artifactId>
+        <version>${validate.jakarta}</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.annotation</groupId>
+        <artifactId>jakarta.annotation-api</artifactId>
+        <version>${annotation.jakarta}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.hibernate.validator</groupId>
+        <artifactId>hibernate-validator</artifactId>
+        <version>${validate.hibernate}</version>
+      </dependency>
+      -->
+      <!-- zxing -->
+      <dependency>
+        <groupId>com.google.zxing</groupId>
+        <artifactId>core</artifactId>
+        <version>${zxing.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.zxing</groupId>
+        <artifactId>javase</artifactId>
+        <version>${zxing.version}</version>
+      </dependency>
+
+      <!-- json -->
+      <dependency>
+        <groupId>org.json</groupId>
+        <artifactId>json</artifactId>
+        <version>${json.version}</version>
+      </dependency>
+      <!-- jackson: 版本由 spring-boot-dependencies BOM 管理 -->
+      <!-- 
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      -->
+      <!-- gson -->
+      <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>${gson.version}</version>
+      </dependency>
+      <!-- fastjson -->
+      <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>fastjson</artifactId>
+        <version>${fastjson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.alibaba.fastjson2</groupId>
+        <artifactId>fastjson2</artifactId>
+        <version>${fastjson.version}</version>
+      </dependency>
+      <!-- dom4j -->
+      <dependency>
+        <groupId>org.dom4j</groupId>
+        <artifactId>dom4j</artifactId>
+        <version>${dom4j.version}</version>
+      </dependency>
+
+      <!-- db -->
+      <!-- mysql <= 8.0 -->
+      <dependency>
+        <groupId>mysql</groupId>
+        <artifactId>mysql-connector-java</artifactId>
+        <version>${mysql.version}</version>
+      </dependency>
+      <!-- 推荐 -->
+      <dependency>
+        <groupId>com.mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <version>${mysql-j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <version>${h2.version}</version>
+      </dependency>
+      <!-- mybatis -->
+      <dependency>
+        <groupId>org.mybatis.spring.boot</groupId>
+        <artifactId>mybatis-spring-boot-starter</artifactId>
+        <version>${mybatis-sboot.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis</groupId>
+        <artifactId>mybatis-spring</artifactId>
+        <version>${mybatis-spring.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mybatis</groupId>
+        <artifactId>mybatis</artifactId>
+        <version>${mybatis.version}</version>
+      </dependency>
+      <!-- jsqlparser -->
+      <dependency>
+        <groupId>com.github.jsqlparser</groupId>
+        <artifactId>jsqlparser</artifactId>
+        <version>${jsqlparser.version}</version>
+      </dependency>
+
+      <!-- email -->
+      <!-- 由 spring-boot 3.x 统一管理依赖 -->
+      <!--
+      <dependency>
+        <groupId>jakarta.mail</groupId>
+        <artifactId>jakarta.mail-api</artifactId>
+        <version>${mail.jakarta}</version>
+      </dependency>
+      -->
+      <!-- ehcache -->
+      <dependency>
+        <groupId>org.ehcache</groupId>
+        <artifactId>ehcache</artifactId>
+        <version>${ehcache.version}</version>
+      </dependency>
+
+      <!-- itextpdf -->
+      <!-- https://itextpdf.com/en/resources/installation-guides/installing-itext-7-java -->
+      <dependency>
+        <groupId>com.itextpdf</groupId>
+        <artifactId>itext7-core</artifactId>
+        <version>${itext.version}</version>
+        <type>pom</type>
+      </dependency>
+
+      <!-- poi -->
+      <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi</artifactId>
+        <version>${poi.version}</version>
+      </dependency>
+      <!-- poi : excel -->
+      <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-ooxml</artifactId>
+        <version>${poi.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-ooxml-schemas</artifactId>
+        <version>${poi.version}</version>
+      </dependency>
+      <!-- poi : word, ppt, visio -->
+      <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-scratchpad</artifactId>
+        <version>${poi.version}</version>
+      </dependency>
+      <!-- yaml 随 org.springframework.boot:spring-boot-starter -->
+      <!--
+      <dependency>
+        <groupId>org.yaml</groupId>
+        <artifactId>snakeyaml</artifactId>
+        <version>${yaml.version}</version>
+      </dependency>
+      -->
+
+      <!-- https://github.com/springfox/springfox -->
+      <!-- spring boot 2.5.x 之前可以用 springfox -->
+      <dependency>
+        <groupId>io.springfox</groupId>
+        <artifactId>springfox-boot-starter</artifactId>
+        <version>${springfox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.springfox</groupId>
+        <artifactId>springfox-core</artifactId>
+        <version>${springfox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.springfox</groupId>
+        <artifactId>springfox-oas</artifactId>
+        <version>${springfox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.springfox</groupId>
+        <artifactId>springfox-swagger-common</artifactId>
+        <version>${springfox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.springfox</groupId>
+        <artifactId>springfox-spring-webflux</artifactId>
+        <version>${springfox.version}</version>
+      </dependency>
+      <!-- https://springdoc.org -->
+      <!-- 强烈推荐 -->
+      <!-- 1.8.0: spring 1.x、spring 2.x -->
+      <!-- 2.8.4: spring 3.x -->
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+      <!-- swagger -->
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-annotations</artifactId>
+        <version>${swagger-v3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-core</artifactId>
+        <version>${swagger-v3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-models</artifactId>
+        <version>${swagger-v3.version}</version>
+      </dependency>
+
+      <!-- DCM, HL7 -->
+      <!-- https://mvnrepository.com/artifact/org.dcm4che/dcm4che-core -->
+      <dependency>
+        <groupId>org.dcm4che</groupId>
+        <artifactId>dcm4che-core</artifactId>
+        <version>5.29.2</version>
+      </dependency>
+
+      <!-- PinYin -->
+      <!-- https://github.com/belerweb/pinyin4j -->
+      <!-- https://mvnrepository.com/artifact/com.belerweb/pinyin4j -->
+      <dependency>
+        <groupId>com.belerweb</groupId>
+        <artifactId>pinyin4j</artifactId>
+        <version>2.5.0</version>
+      </dependency>
+
+      <!-- Bouncy Castle 国密算法支持 -->
+      <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk18on -->
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>1.84</version>
+      </dependency>
+      <!-- JSpecify 空安全注解 -->
+      <!-- https://mvnrepository.com/artifact/org.jspecify/jspecify -->
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>1.0.0</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!-- ================================================
+     * 指定不同环境变量，可用变量：dev、test、demo、prod
+     * 优先级：
+     * 在编译打包时可以指定-P参数，将忽略profiles中的定义，如：mvn package -Ptest
+     * 若没有system*.properties时，以dev模式打包
+     * 若存在system.properties时，以prod模式打包
+     * 若存在system-*.properties时，按 dev > test > demo > prod 的优先级打包
+     * ================================================ -->
+  <profiles>
+    <!-- 没有system*.properties时，以dev模式打包 -->
+    <profile>
+      <id>default-dev</id>
+      <properties>
+        <environment.active>dev</environment.active>
+      </properties>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+    </profile>
+    <!-- 存在system.properties时，以prod模式打包 -->
+    <profile>
+      <id>default-prod</id>
+      <properties>
+        <environment.active>prod</environment.active>
+      </properties>
+      <activation>
+        <file>
+          <exists>src/main/resources/system.properties</exists>
+        </file>
+      </activation>
+    </profile>
+    <!-- 存在system-*.properties时，按 dev > test > demo > prod 的优先级打包 -->
+    <profile>
+      <id>prod</id>
+      <properties>
+        <environment.active>prod</environment.active>
+      </properties>
+      <activation>
+        <file>
+          <exists>src/main/resources/system-prod.properties</exists>
+        </file>
+      </activation>
+    </profile>
+    <profile>
+      <id>demo</id>
+      <properties>
+        <environment.active>demo</environment.active>
+      </properties>
+      <activation>
+        <file>
+          <exists>src/main/resources/system-demo.properties</exists>
+        </file>
+      </activation>
+    </profile>
+    <profile>
+      <id>test</id>
+      <properties>
+        <environment.active>test</environment.active>
+      </properties>
+      <activation>
+        <file>
+          <exists>src/main/resources/system-test.properties</exists>
+        </file>
+      </activation>
+    </profile>
+    <profile>
+      <id>dev</id>
+      <properties>
+        <environment.active>dev</environment.active>
+      </properties>
+      <activation>
+        <file>
+          <exists>src/main/resources/system-dev.properties</exists>
+        </file>
+      </activation>
+    </profile>
+  </profiles>
+
+  <!-- 全局build配置，所有项目编译时都会执行 -->
+  <build>
+    <!-- 打包时过滤properties和yaml文件，与maven-resources-plugin配合使用 -->
+    <resources>
+      <resource>
+        <directory>src/main/java</directory>
+        <filtering>false</filtering><!-- 是否替换资源中的属性-->
+        <includes>
+          <include>**/*.properties</include>
+          <include>**/*.xml</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+        <excludes>
+          <exclude>dll/**</exclude>
+          <exclude>lib/**</exclude>
+          <exclude>dev/**</exclude>
+          <exclude>test/**</exclude>
+          <exclude>demo/**</exclude>
+          <exclude>prod/**</exclude>
+          <exclude>**/*.sh</exclude>
+          <exclude>**/*.bat</exclude>
+        </excludes>
+      </resource>
+      <resource><!-- 指定环境的信息（会覆盖根目录下的同名文件！） -->
+        <directory>src/main/resources/${environment.active}</directory>
+        <filtering>false</filtering>
+        <excludes>
+          <exclude>**/*.sh</exclude>
+          <exclude>**/*.bat</exclude>
+        </excludes>
+      </resource>
+    </resources>
+
+    <!-- 声明plugin，每个项目都会生效 -->
+    <plugins>
+      <!-- 将打包时过滤的properties和yaml文件，复制到conf目录下 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.5.0</version>
+        <configuration>
+          <encoding>${project.build.sourceEncoding}</encoding>
+        </configuration>
+        <executions>
+          <!-- 复制配置信息到config -->
+          <execution>
+            <id>copy-resources</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/config</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/resources</directory>
+                  <filtering>false</filtering>
+                  <includes>
+                    <include>**/*.properties</include>
+                    <include>**/*.yml</include>
+                  </includes>
+                  <excludes>
+                    <exclude>dev/**</exclude>
+                    <exclude>test/**</exclude>
+                    <exclude>demo/**</exclude>
+                    <exclude>prod/**</exclude>
+                  </excludes>
+                </resource>
+                <resource><!-- 指定环境的信息（会覆盖根目录下的同名文件！） -->
+                  <directory>src/main/resources/${environment.active}</directory>
+                  <filtering>false</filtering>
+                  <includes>
+                    <include>**/*.properties</include>
+                    <include>**/*.yml</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <!-- 复制启动文件到根目录 -->
+          <execution>
+            <id>copy-boot</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/resources</directory>
+                  <filtering>true</filtering>
+                  <includes>
+                    <include>*.sh</include>
+                    <include>*.bat</include>
+                  </includes>
+                </resource>
+                <resource><!-- 指定环境的信息（会覆盖根目录下的同名文件！） -->
+                  <directory>src/main/resources/${environment.active}</directory>
+                  <filtering>true</filtering>
+                  <includes>
+                    <include>*.sh</include>
+                    <include>*.bat</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <!-- 将dll、so文件复制到lib -->
+          <execution>
+            <id>copy-dll</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+              <resources>
+                <!-- 不保留目录结构，全部放到lib下 -->
+                <resource>
+                  <directory>src/main/resources/lib</directory>
+                  <filtering>false</filtering>
+                </resource>
+                <resource>
+                  <directory>src/main/resources/dll</directory>
+                  <filtering>false</filtering>
+                </resource>
+                <resource>
+                  <directory>src/main/resources/so</directory>
+                  <filtering>false</filtering>
+                </resource>
+                <!-- 会保留目录结构，在lib下按照原目录生成 -->
+                <!-- <resource>-->
+                <!--     <directory>src/main/resources</directory>-->
+                <!--     <filtering>false</filtering>-->
+                <!--     <includes>-->
+                <!--         <include>**/*.dll*</include>-->
+                <!--         <include>**/*.so*</include>-->
+                <!--         <include>**/*.lib*</include>-->
+                <!--     </includes>-->
+                <!-- </resource>-->
+              </resources>
+            </configuration>
+          </execution>
+          <!-- 将lib文件复制到lib下 -->
+          <execution>
+            <id>copy-lib</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/resources/lib</directory>
+                  <filtering>false</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- 编译时忽略测试出错的影响 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.5</version>
+        <configuration>
+          <skip>true</skip> <!-- mvn install 时跳过test -->
+          <skipTests>true</skipTests> <!-- 跳过test -->
+          <testFailureIgnore>true</testFailureIgnore>
+        </configuration>
+      </plugin>
+      <!-- 打包git标识 -->
+      <!-- https://github.com/git-commit-id/git-commit-id-maven-plugin/blob/master/docs/using-the-plugin.md -->
+      <plugin>
+        <groupId>io.github.git-commit-id</groupId>
+        <artifactId>git-commit-id-maven-plugin</artifactId>
+        <version>10.0.0</version>
+        <executions>
+          <execution>
+            <id>get-the-git-infos</id>
+            <goals>
+              <goal>revision</goal>
+            </goals>
+            <phase>initialize</phase>
+          </execution>
+        </executions>
+        <configuration>
+          <!-- 日期格式（yyyy-MM-dd'T'HH:mm:ssZ） -->
+          <dateFormat>yyyy-MM-dd'T'HH:mm:ssZ</dateFormat>
+          <!-- 构建过程时打印详细信息（false） -->
+          <verbose>false</verbose>
+          <format>json</format>
+          <!-- ".git"文件路径;默认值:${project.basedir}/.git -->
+          <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
+          <!-- 无".git"文件夹时,构建是否失败（true） -->
+          <failOnNoGitDirectory>false</failOnNoGitDirectory>
+          <!-- 生成"git.properties"文件（false） -->
+          <generateGitPropertiesFile>true</generateGitPropertiesFile>
+          <!-- 指定"git.properties"文件的存放路径(相对于${project.basedir}的一个路径，默认为根) -->
+          <generateGitPropertiesFilename>${project.build.outputDirectory}/git.properties</generateGitPropertiesFilename>
+          <commitIdGenerationMode>full</commitIdGenerationMode>
+          <!-- git描述配置,由JGit提供实现（https://git-scm.com/docs/git-describe） -->
+          <gitDescribe>
+            <!-- 是否生成描述属性 -->
+            <skip>false</skip>
+            <!-- 未发现tag时,仅打印提交操作ID -->
+            <always>false</always>
+            <!-- 提交操作ID显式字符长度,最大值为:40;默认值:7 -->
+            <abbrev>7</abbrev>
+            <!-- 对含未提交代码(即"dirty state")构建时,添加指定后缀;默认值:""; -->
+            <dirty>-dirty</dirty>
+            <!--always print using the "tag-commits_from_tag-g_commit_id-maybe_dirty" format, even if "on" a tag.
+                The distance will always be 0 if you're "on" the tag.
+            -->
+            <forceLongFormat>false</forceLongFormat>
+          </gitDescribe>
+        </configuration>
+      </plugin>
+      <!-- 设置编译版本 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.15.0</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+          <encoding>${project.build.sourceEncoding}</encoding>
+          <!-- 必须开启这个，SpEL才能按参数名绑定 -->
+          <parameters>true</parameters>
+        </configuration>
+      </plugin>
+    </plugins>
+
+    <!-- 声明plugin，不会被引入，需在实际pom中手动引入plugin -->
+    <pluginManagement>
+      <plugins>
+        <!-- 配置生成Javadoc包 -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>3.12.0</version>
+          <configuration>
+            <encoding>${project.build.sourceEncoding}</encoding>
+            <charset>${project.build.sourceEncoding}</charset>
+            <docencoding>${project.build.sourceEncoding}</docencoding>
+            <!-- 禁用Javadoc严格语法校验（适配OpenJDK模块化规则） -->
+            <additionalOptions>
+              <additionalOption>-Xdoclint:none</additionalOption>
+            </additionalOptions>
+            <!-- 兼容写法：同时添加doclint节点，适配模块化Javadoc规则 -->
+            <doclint>none</doclint>
+            <!-- 避免因为文档错误中断构建 -->
+            <failOnError>false</failOnError>
+          </configuration>
+          <executions>
+            <execution>
+              <id>attach-javadocs</id>
+              <phase>package</phase>
+              <goals>
+                <goal>jar</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <!-- 配置生成source包 -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>3.4.0</version>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>jar-no-fork</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <!-- 拷贝依赖的jar包到lib目录 -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.10.0</version>
+          <executions>
+            <execution>
+              <id>copy-dependencies</id>
+              <phase>package</phase>
+              <goals>
+                <goal>copy-dependencies</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <!-- <includeScope>runtime</includeScope>-->
+            <!-- 拷贝依赖包到指定目录下 -->
+            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+          </configuration>
+        </plugin>
+        <!-- 打包jar文件时，配置manifest文件，加入config和lib包的jar依赖 -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.5.0</version>
+          <configuration>
+            <!-- 将配置文件排除在jar包 -->
+            <excludes>
+            </excludes>
+            <archive>
+              <!-- 生成的jar中，包含pom.xml和pom.properties这两个文件 -->
+              <addMavenDescriptor>true</addMavenDescriptor>
+              <!-- 将lib下的jar包加入classpath -->
+              <manifest>
+                <addClasspath>false</addClasspath>
+                <!-- 瘦身模式1：采用java标准打包（非springboot打包），将分离到外部的lib依赖包路径写入MANIFEST.MF的classpath中   -->
+                <!-- 运行方式：java -jar ${project}.jar   -->
+                <!--
+                <addClasspath>true</addClasspath>
+                <classpathPrefix>lib/</classpathPrefix>
+                -->
+                <!-- 支持Spring注解自动扫描Jar中的类 -->
+                <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+              </manifest>
+              <!-- 默认将config加入classpath -->
+              <manifestEntries>
+                <Class-Path>config/</Class-Path>
+              </manifestEntries>
+            </archive>
+            <classesDirectory>
+            </classesDirectory>
+          </configuration>
+        </plugin>
+        <!-- 打包war文件时，配置manifest文件，加入config和lib包的jar依赖. -->
+        <!-- 注：web项目，目前不采用war发布，而是传统方式部署,             -->
+        <!--    但指定项目为war时，maven默认会打war包,                   -->
+        <!--    因此为了加快打包速度，static、lib文件夹不打包到war中.      -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-war-plugin</artifactId>
+          <version>3.5.1</version>
+          <configuration>
+            <!-- <archiveClasses>true</archiveClasses> --><!-- 将classes打成jar包. -->
+            <failOnMissingWebXml>false</failOnMissingWebXml><!-- 忽略web.xml文件. -->
+            <warSourceExcludes><!-- 从resource（webapp）复制时忽略. -->
+              static/**,         <!-- 不将static打入war包. -->
+              css/**,            <!-- 不将css打入war包. -->
+              js/**              <!-- 不将js打入war包. -->
+            </warSourceExcludes>
+            <packagingExcludes><!-- 打包时忽略. -->
+              WEB-INF/lib/*.jar <!-- 不将jar打入war包. -->
+            </packagingExcludes>
+            <archive>
+              <!-- 将lib下的jar包加入classpath -->
+              <manifest>
+                <addClasspath>false</addClasspath>
+                <!-- 打包为可执行文件时，需要将依赖包打入classpath -->
+                <!--
+                <addClasspath>true</addClasspath>
+                <classpathPrefix>lib/</classpathPrefix>
+                -->
+                <!-- 支持Spring注解自动扫描Jar中的类 -->
+                <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+              </manifest>
+              <!-- 将config加入classpath -->
+              <manifestEntries>
+                <Class-Path>config/</Class-Path>
+              </manifestEntries>
+            </archive>
+            <classesDirectory>
+            </classesDirectory>
+          </configuration>
+        </plugin>
+
+        <!-- springboot打包 -->
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>${spring.boot.version}</version>
+          <configuration>
+            <!-- 会自动加载标注了 @SpringBootApplication 的启动类 -->
+            <!-- <mainClass>${start-class}</mainClass> -->
+            <!-- 2.1.4 之后不包含该属性 -->
+            <finalName>${project.artifactId}</finalName>
+            <!-- 3.x 之后默认可执行，不再需要该属性，已被移除 -->
+            <!-- <executable>true</executable> -->
+            <excludeDevtools>false</excludeDevtools>
+            <!-- <classifier>exec</classifier> --><!-- 可执行包的后缀 -->
+            <!-- 瘦身模式2：采用springboot的ZIP方式（推荐），配合 maven-dependency-plugin 使用. -->
+            <!-- 运行方式：java -Dloader.path=lib -jar ${project}.jar   -->
+            <!-- 默认不采用瘦身模式打包，方便docker部署. -->
+            <!--
+            <layout>ZIP</layout>
+            <includes>
+                <include>
+                    <groupId>nothing</groupId>
+                    <artifactId>nothing</artifactId>
+                </include>
+            </includes>
+            -->
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>repackage</goal>
+              </goals>
+            </execution>
+          </executions>
+          <dependencies>
+            <!-- 热部署，仅对mvn spring-boot:run这种启动方式生效 -->
+            <!--
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>springloaded</artifactId>
+                <version>${spring-loaded.version}</version>
+            </dependency>
+            -->
+          </dependencies>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

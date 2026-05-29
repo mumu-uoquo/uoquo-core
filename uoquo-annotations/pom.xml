@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.uoquo</groupId>
+        <artifactId>dependencies</artifactId>
+        <version>1.1.0</version>
+        <relativePath/>
+    </parent>
+
+    <artifactId>uoquo-annotations</artifactId>
+    <packaging>jar</packaging>
+    <description>常用对象定义</description>
+
+    <!-- 项目必须引入的jar包 -->
+    <dependencies>
+        <!-- swagger -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- spring-context（用于 @Conditional 等注解） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- JSpecify 空安全注解 -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- 打包插件 -->
+    <build>
+        <plugins>
+            <!-- 配置生成source包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <!-- 配置生成Javadoc包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

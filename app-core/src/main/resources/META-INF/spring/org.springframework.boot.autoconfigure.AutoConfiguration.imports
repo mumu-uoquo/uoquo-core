@@ -1,0 +1,8 @@
+com.uoquo.web.config.EventConfig
+com.uoquo.web.config.RedisConfig
+com.uoquo.web.config.MyBatisPluginConfig
+com.uoquo.web.config.TaskSchedulerConfig
+com.uoquo.web.config.WebFilterConfig
+com.uoquo.web.config.WebHttpConfig
+com.uoquo.web.ServiceConfig
+com.uoquo.web.ServiceAutoConfiguration

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.uoquo</groupId>
+    <artifactId>dependencies</artifactId>
+    <version>1.1.0</version>
+    <relativePath/>
+  </parent>
+
+  <artifactId>app-core</artifactId>
+  <packaging>jar</packaging>
+  <description>单应用的基础类（参数解析、统一响应、统一异常、统一接口等）</description>
+
+  <!-- 项目必须引入的jar包 -->
+  <dependencies>
+    <!-- 工具包 -->
+    <dependency>
+      <groupId>com.uoquo</groupId>
+      <artifactId>utils-basic</artifactId>
+      <version>${uoquo.version}</version>
+    </dependency>
+    <!-- servlet -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- spring -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-beans</artifactId>
+    </dependency>
+    <!-- db -->
+    <dependency>
+      <groupId>org.mybatis</groupId>
+      <artifactId>mybatis-spring</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.mybatis</groupId>
+      <artifactId>mybatis</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.jsqlparser</groupId>
+      <artifactId>jsqlparser</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.alibaba</groupId>
+      <artifactId>druid-spring-boot-3-starter</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.validation</groupId>
+      <artifactId>jakarta.validation-api</artifactId>
+    </dependency>
+    <!-- test -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.alibaba.fastjson2</groupId>
+      <artifactId>fastjson2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.alibaba.nacos</groupId>
+      <artifactId>nacos-client</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <!-- 打包插件 -->
+  <build>
+    <plugins>
+      <!-- 配置生成source包 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
+      <!-- 配置生成Javadoc包 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

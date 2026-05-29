@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.uoquo</groupId>
+        <artifactId>dependencies</artifactId>
+        <version>1.1.0</version>
+        <relativePath/>
+    </parent>
+
+    <artifactId>utils-basic</artifactId>
+    <packaging>jar</packaging>
+    <description>字符串, 日期等工具类</description>
+
+    <!-- 项目必须引入的jar包 -->
+    <dependencies>
+        <dependency>
+            <groupId>com.uoquo</groupId>
+            <artifactId>uoquo-annotations</artifactId>
+            <version>${uoquo.version}</version>
+        </dependency>
+        <!-- spring -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+        </dependency>
+        <!-- redis -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+        </dependency>
+        <!-- json -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+        <!-- Jackson 没有内置Java 8时间处理器，需引入 jackson-datatype-jsr310 -->
+        <dependency>
+          <groupId>com.fasterxml.jackson.datatype</groupId>
+          <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <!-- okhttp -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+        </dependency>
+        <!-- email jakarta -->
+        <dependency>
+            <groupId>jakarta.mail</groupId>
+            <artifactId>jakarta.mail-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.angus</groupId>
+            <artifactId>angus-mail</artifactId>
+        </dependency>
+        <!-- zxing -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+        </dependency>
+        <!-- PinYin -->
+        <dependency>
+            <groupId>com.belerweb</groupId>
+            <artifactId>pinyin4j</artifactId>
+        </dependency>
+        <!-- validation provider -->
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
+        </dependency>
+        <!-- Bouncy Castle 国密算法支持 -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+        </dependency>
+        <!-- JSpecify 空安全注解 -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+        <!-- jqwik 属性测试框架 -->
+        <dependency>
+            <groupId>net.jqwik</groupId>
+            <artifactId>jqwik</artifactId>
+            <version>1.9.1</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- 打包插件 -->
+    <build>
+        <plugins>
+            <!-- 配置生成source包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <!-- 配置生成Javadoc包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+            </plugin>
+            <!-- 覆盖父pom中的surefire配置，允许运行测试 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skip>false</skip>
+                    <skipTests>false</skipTests>
+                    <testFailureIgnore>false</testFailureIgnore>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

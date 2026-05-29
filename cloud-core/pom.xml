@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.uoquo</groupId>
+        <artifactId>dependencies</artifactId>
+        <version>1.1.0</version>
+        <relativePath/>
+    </parent>
+
+    <artifactId>cloud-core</artifactId>
+    <packaging>jar</packaging>
+    <description>微服务应用的基础类（统一验参、统一事务、服务间的调用）</description>
+
+    <!-- 项目必须引入的jar包 -->
+    <dependencies>
+        <dependency>
+            <groupId>com.uoquo</groupId>
+            <artifactId>app-core</artifactId>
+            <version>${uoquo.version}</version>
+        </dependency>
+        <!-- jackson -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- spring -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+        <!-- spring cloud -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-commons</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-bus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <!-- redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- feign -->
+        <!-- SpringCloud Feign在Hoxton.M2 RELEASED版本之后不再使用Ribbon而是使用spring-cloud-loadbalancer -->
+        <!-- https://mvnrepository.com/artifact/org.springframework.cloud/spring-cloud-loadbalancer -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-loadbalancer</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.cloud</groupId>-->
+<!--            <artifactId>spring-cloud-openfeign-core</artifactId>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>io.github.openfeign</groupId>-->
+<!--            <artifactId>feign-okhttp</artifactId>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>io.github.openfeign.form</groupId>-->
+<!--            <artifactId>feign-form-spring</artifactId>-->
+<!--        </dependency>-->
+        <!-- db -->
+        <dependency>
+            <groupId>org.apache.seata</groupId>
+            <artifactId>seata-all</artifactId>
+        </dependency>
+    </dependencies>
+
+    <!-- 打包插件 -->
+    <build>
+        <plugins>
+            <!-- 配置生成source包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <!-- 配置生成Javadoc包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

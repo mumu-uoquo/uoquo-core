@@ -1,0 +1,5 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.uoquo.cloud.config.KafkaConfig,\
+com.uoquo.cloud.config.RemoteEventDeserializerAutoConfiguration,\
+com.uoquo.cloud.CloudConfig,\
+com.uoquo.cloud.CloudAutoConfiguration
