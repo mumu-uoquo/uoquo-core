@@ -32,8 +32,8 @@ import java.sql.SQLException;
 import java.util.*;
 
 /**
- * 分页拦截�?br/>
- * 采用 PageHelper 的形式，通过 ThreadLocal 传递分页参�?
+ * 分页拦截器<br/>
+ * 采用 PageHelper 的形式，通过 ThreadLocal 传递分页参数
  *
  * @author xuhz
  */
@@ -47,7 +47,7 @@ public class PageInterceptor implements Interceptor {
     private static final List<ResultMapping> EMPTY_RESULT_MAPPING = Collections.emptyList();
 
     /**
-     * additionalParameters 字段缓存（BoundSql 中的私有字段�?
+     * additionalParameters 字段缓存（BoundSql 中的私有字段）
      */
     private static final Field ADDITIONAL_PARAMETERS_FIELD;
 
@@ -82,12 +82,12 @@ public class PageInterceptor implements Interceptor {
         try {
             if (page == null) {
                 RowBounds rowBounds = (RowBounds) args[2];
-                // rowBounds 为空或为初始值，说明不分�?
+                // rowBounds 为空或为初始值，说明不分页
                 if (rowBounds == null
                         || (rowBounds.getLimit() == RowBounds.NO_ROW_LIMIT && rowBounds.getOffset() == RowBounds.NO_ROW_OFFSET)) {
                     return executeWithoutPage(invocation, args, bgn);
                 }
-                // �?RowBounds 转换�?page
+                // 将 RowBounds 转换为 page
                 int pageSize = rowBounds.getLimit();
                 int pageNum = rowBounds.getOffset() / pageSize + 1;
                 page = new PageList<>(pageNum, pageSize);
@@ -105,7 +105,7 @@ public class PageInterceptor implements Interceptor {
     }
 
     /**
-     * 非分页查询执�?
+     * 非分页查询执行
      */
     private Object executeWithoutPage(Invocation invocation, Object[] args, long bgn) throws Throwable {
         try {
@@ -186,7 +186,7 @@ public class PageInterceptor implements Interceptor {
     }
 
     /**
-     * 复制 additionalParameters 到新�?BoundSql
+     * 复制 additionalParameters 到新的 BoundSql
      */
     private void copyAdditionalParameters(BoundSql targetBoundSql, Map<String, Object> additionalParameters) {
         for (Map.Entry<String, Object> entry : additionalParameters.entrySet()) {
@@ -215,7 +215,7 @@ public class PageInterceptor implements Interceptor {
             Select select = (Select) CCJSqlParserUtil.parse(sql);
             PlainSelect ps = select.getPlainSelect();
             if (ps == null) {
-                // �?PlainSelect（如 UNION），包装为子查询
+                // 非 PlainSelect（如 UNION），包装为子查询
                 return "SELECT COUNT(1) FROM (" + sql + ") mybatis_count_table";
             }
 
@@ -261,7 +261,7 @@ public class PageInterceptor implements Interceptor {
     }
 
     /**
-     * 简�?count SQL 构建（解析失败时的兜底）
+     * 简版 count SQL 构建（解析失败时的兜底）
      */
     private String fallbackBuildCountSql(String sql) {
         sql = sql.replaceAll("[\\s]+", " ").trim();

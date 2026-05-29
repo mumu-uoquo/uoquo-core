@@ -29,9 +29,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * 描述：登录用户信息拦�? <br>
- * 日期�?018-01-25 11:13 <br>
- * 变更�?
+ * 描述：登录用户信息拦截. <br>
+ * 日期：2018-01-25 11:13 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -45,7 +45,7 @@ public abstract class CurrentUserInterceptorAdapter  implements HandlerIntercept
     protected Logger log = LoggerFactory.getLogger(this.getClass());
 
     /**
-     * Controller方法处理完之后，DispatcherServlet进行视图的渲染之�?
+     * Controller方法处理完之后，DispatcherServlet进行视图的渲染之前
      */
     @Override
     public void afterCompletion(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler, @Nullable Exception ex)
@@ -110,7 +110,7 @@ public abstract class CurrentUserInterceptorAdapter  implements HandlerIntercept
         if (StringUtil.notNull(deviceId)) {
             CurrentUser.setDeviceId(deviceId);
         }
-        // 如果没有机构信息，则从补充appid对应的机构ID（大多出现在内部定时任务发起的remote请求，此时可能只有appid，没有机构ID�?
+        // 如果没有机构信息，则从补充appid对应的机构ID（大多出现在内部定时任务发起的remote请求，此时可能只有appid，没有机构ID）
         if (StringUtil.isNull(CurrentUser.getInfo().getInstituteId())) {
             CurrentUser.AppInfo appInfo = RedisUtil.getLocalCache(BaseCacheKey.APPKEY_INFO_PREFIX + appkey, CurrentUser.AppInfo.class);
             if (appInfo != null) {
@@ -119,7 +119,7 @@ public abstract class CurrentUserInterceptorAdapter  implements HandlerIntercept
         }
         // 请求ID
         String rid = null;
-        // 如果是微服务，则从请求头中获�?
+        // 如果是微服务，则从请求头中获取
         String gatewayTime = request.getHeader(CurrentUser.GATEWAY_TIME);
         String gatewaySign = request.getHeader(CurrentUser.GATEWAY_SIGN);
         if (StringUtil.notNull(gatewayTime) && StringUtil.notNull(gatewaySign)) {

@@ -40,13 +40,13 @@ import java.util.TreeMap;
 
 /**
  * 描述：全局异常处理（业务异常、入参绑定）.<br>
- * 说明：响应码�?200，方便前端统一处理
+ * 说明：响应码为 200，方便前端统一处理
  * <pre>
- * 优点�?
- *     1. 能捕�?控制器、参数绑定等错误.
+ * 优点：
+ *     1. 能捕获 控制器、参数绑定等错误.
  *     2. 可以获取请求时的参数
- * 缺点：无法捕�?404、过滤器、拦截器的错�?
- * 用法：作为全局异常的主处理方法，由 GlobalExceptionController 作补�?
+ * 缺点：无法捕获 404、过滤器、拦截器的错误.
+ * 用法：作为全局异常的主处理方法，由 GlobalExceptionController 作补偿
  * 资料：https://blog.csdn.net/weixin_36380516/article/details/132506064
  * </pre>
  */
@@ -62,7 +62,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @PostConstruct
     public void init() {
-        // 为了不暴露服务器IP，只留服务器IP的最后一�?
+        // 为了不暴露服务器IP，只留服务器IP的最后一位
         int idx = serverIp.lastIndexOf(".");
         if (StringUtil.notNull(serverIp) && (idx > -1)) {
             serverIp = serverIp.substring(idx + 1);
@@ -80,7 +80,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * 处理方法参数验证失败的异�?
+     * 处理方法参数验证失败的异常
      */
     @Override
     protected @NonNull ResponseEntity<Object> handleExceptionInternal(@NonNull Exception error, @Nullable Object body, @NonNull HttpHeaders headers, @NonNull HttpStatusCode status, @NonNull WebRequest webRequest) {
@@ -96,13 +96,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             request = attributes.getRequest();
             response = attributes.getResponse();
         }
-        // 2. 格式化异常信�?
+        // 2. 格式化异常信息
         AbstractBaseException ex;
         if (request != null) {
             ex = this.getErrorException(error, request, response);
         } else {
             ex = new SystemErrorException(error);
-            // 增加错误码到响应头，主要用于响应内容为文件流的接�?
+            // 增加错误码到响应头，主要用于响应内容为文件流的接口
             if (response != null) {
                 response.setHeader("response-code", ex.getStatus());
             }
@@ -112,7 +112,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * 格式化异常信�?
+     * 格式化异常信息
      */
     private AbstractBaseException getErrorException(Exception error, HttpServletRequest request, HttpServletResponse response) {
         // 1. 组装基础数据
@@ -126,21 +126,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String userInfo = JsonUtil.serialize(user);
         // 请求参数
         TreeMap<String, Object> params = WebUtil.getRequestParams(request);
-        // 请求体（去掉文件�?
+        // 请求体（去掉文件）
         String reqBody = null;
         String contentType = request.getHeader("Content-Type");
         contentType = (contentType == null) ? "" : contentType.toLowerCase();
         if (!contentType.startsWith("multipart/form-data") && !contentType.startsWith("application/octet-stream")) {
             reqBody = WebUtil.getRequestBody(request);
-            // INFO只记�?000字符以内的数据（便于以后查问题，此处放开�?
+            // INFO只记录1000字符以内的数据（便于以后查问题，此处放开）
 //            if ((body.length() > 1000) && !log.isDebugEnabled()) {
 //                body = body.substring(0, 1000) + "...";
 //            }
         }
         // 2. 格式化错误信息及日志记录
         AbstractBaseException ex;
-        if (error instanceof RemoteServiceException         // 其他服务抛出的异�?
-                || error instanceof SystemErrorException    // 无权操作的异�?
+        if (error instanceof RemoteServiceException         // 其他服务抛出的异常
+                || error instanceof SystemErrorException    // 无权操作的异常
         ) {
             // 此时需要记录异常的堆栈详情
             ex = (AbstractBaseException) error;
@@ -148,7 +148,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
                     clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, ex.getTrace());
         } else if (error instanceof AbstractBaseException) {
-            // 如果是自定义其他异常，不记录详细的异常信�?
+            // 如果是自定义其他异常，不记录详细的异常信息
             ex = (AbstractBaseException) error;
             if (log.isDebugEnabled()) {
                 log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .\n{}",
@@ -173,7 +173,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                     clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, error);
         } else if (error instanceof ConstraintViolationException) {
             // FORM入参校验失败
-            // TODO 后续是否可以拿到具体的字�?
+            // TODO 后续是否可以拿到具体的字段
             ex = new ParamErrorException(error);
             log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
                     requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
@@ -200,7 +200,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             tracePrefix.append("traceId: ").append(CurrentUser.getTraceId()).append("\n");
             ex.setTrace(tracePrefix.toString());
         }
-        // 增加错误码到响应头，主要用于响应内容为文件流的接�?
+        // 增加错误码到响应头，主要用于响应内容为文件流的接口
         if (response != null) {
             response.setHeader("response-code", ex.getStatus());
         }

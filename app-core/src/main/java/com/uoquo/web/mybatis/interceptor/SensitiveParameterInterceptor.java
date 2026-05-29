@@ -28,11 +28,11 @@ import java.util.*;
 /**
  * 参数加密插件<br/>
  * <pre>
- * 使用 mybatis 插件时需要定义签�?
+ * 使用 mybatis 插件时需要定义签名
  * \@Intercepts({
  *      \@Signature(type = Executor.class, method = "query/update", args = {...})
  * })
- * 注：需要实�?Executor 的拦截，而不�?ParameterHandler，否则分页插件的统计数值参数将不会做加密处�?
+ * 注：需要实现 Executor 的拦截，而不是 ParameterHandler，否则分页插件的统计数值参数将不会做加密处理
  * </pre>
  **/
 @Intercepts({
@@ -60,9 +60,9 @@ public class SensitiveParameterInterceptor implements Interceptor {
         }
 
         // 2. 参数处理（单参时直接放入当前参数，多参时 ParamMap 将结果进行包装）
-        // mapper传单参：batchInsert(List<UserInfo> users); MyBatis 会包装成 ParamMap（key=list），从而走�?2.4 分支
-        // sqlsession直接调用：SqlSession.update(statementId, listParam)，会进入 2.1 �?List 判断逻辑
-        // 2.1 单参，且参数类型�?@SensitiveData 注解时，直接加密整个对象
+        // mapper传单参：batchInsert(List<UserInfo> users); MyBatis 会包装成 ParamMap（key=list），从而走到 2.4 分支
+        // sqlsession直接调用：SqlSession.update(statementId, listParam)，会进入 2.1 的 List 判断逻辑
+        // 2.1 单参，且参数类型有 @SensitiveData 注解时，直接加密整个对象
         Class<?> parameterObjectClass = parameter.getClass();
         SensitiveData sensitiveData = AnnotationUtils.findAnnotation(parameterObjectClass, SensitiveData.class);
         if (Objects.isNull(sensitiveData) && parameter instanceof List<?> paramList) {
@@ -75,7 +75,7 @@ public class SensitiveParameterInterceptor implements Interceptor {
             }
         }
         if (Objects.nonNull(sensitiveData)) {
-            log.debug("[{}]的参数[{}] �?SensitiveData 注解，执行加密处�?", mappedStatement.getId(), parameterObjectClass);
+            log.debug("[{}]的参数[{}] 有 SensitiveData 注解，执行加密处理.", mappedStatement.getId(), parameterObjectClass);
             SensitiveUtil.encrypt(parameter, sensitiveKey);
             return invocation.proceed();
         }
@@ -83,14 +83,14 @@ public class SensitiveParameterInterceptor implements Interceptor {
         // 2.2 获取mapper方法
         Method mapperMethod = MapperMethodResolver.getMethod(mappedStatement.getId());
         if (Objects.isNull(mapperMethod)) {
-            log.debug("[{}]无对应的方法，跳过加�?", mappedStatement.getId());
+            log.debug("[{}]无对应的方法，跳过加密.", mappedStatement.getId());
             return invocation.proceed();
         }
 
-        // 2.3 若没�?@SensitiveField 注解的参数，则跳过加密逻辑
+        // 2.3 若没有 @SensitiveField 注解的参数，则跳过加密逻辑
         Set<String> paramNames = MapperMethodResolver.getSensitiveParamNames(mapperMethod);
         if (CollectionUtils.isEmpty(paramNames)) {
-            log.debug("[{}]�?@SensitiveField 注解的参数，跳过加密.", mappedStatement.getId());
+            log.debug("[{}]无 @SensitiveField 注解的参数，跳过加密.", mappedStatement.getId());
             return invocation.proceed();
         }
 
@@ -112,7 +112,7 @@ public class SensitiveParameterInterceptor implements Interceptor {
                 }
             }
         } else if (parameter instanceof String) {
-            // 单参处理：字符串，需要改�?invocation 参数
+            // 单参处理：字符串，需要改写 invocation 参数
             parameter = SensitiveUtil.encrypt(parameter, sensitiveKey);
             invocation.getArgs()[1] = parameter;
         } else {

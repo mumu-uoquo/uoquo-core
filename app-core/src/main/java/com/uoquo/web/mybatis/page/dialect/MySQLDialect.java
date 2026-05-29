@@ -12,8 +12,8 @@ import org.apache.ibatis.cache.CacheKey;
 
 /**
  * 描述：MySQL分页. <br>
- * 日期�?018-04-02 15:03 <br>
- * 变更�?
+ * 日期：2018-04-02 15:03 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -28,7 +28,7 @@ public class MySQLDialect extends Dialect {
     @Override
     public String getPageSql(String sql, PageList<?> page, CacheKey cacheKey) {
         StringBuilder sqlBuilder = new StringBuilder(sql.length() + 100);
-        // 模糊查询时，分页参数多返回一�?
+        // 模糊查询时，分页参数多返回一条
         int pageSize = page.isCount() ? page.getPageSize() : page.getPageSize() + 1;
         sqlBuilder.append(sql);
         if (page.getBgnRow() == 0) {

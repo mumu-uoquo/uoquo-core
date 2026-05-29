@@ -23,13 +23,13 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 返回值解密插�?br/>
- * 支持两种触发方式�?
+ * 返回值解密插件<br/>
+ * 支持两种触发方式：
  * <ul>
- *   <li>返回的POJO类上�?@SensitiveData 注解</li>
+ *   <li>返回的POJO类上有 @SensitiveData 注解</li>
  *   <li>Mapper方法上有 @SensitiveData 注解</li>
  * </ul>
- * 当返回类型为String且Mapper方法�?@SensitiveData 注解时，直接对字符串解密
+ * 当返回类型为String且Mapper方法有 @SensitiveData 注解时，直接对字符串解密
  **/
 @Intercepts({
         @Signature(type = ResultSetHandler.class, method = "handleResultSets", args = {Statement.class})
@@ -42,7 +42,7 @@ public class SensitiveResultSetInterceptor implements Interceptor {
 
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
-        // 取出查询的结�?
+        // 取出查询的结果
         Object resultObject = invocation.proceed();
         if (Objects.isNull(resultObject)) {
             return null;
@@ -52,7 +52,7 @@ public class SensitiveResultSetInterceptor implements Interceptor {
         SensitiveData methodSensitiveData = getMethodSensitiveData(invocation.getTarget());
 
         if (resultObject instanceof List<?> resultList) {
-            // MyBatis内部统一返回List（selectOne 内部也是�?selectList 再取第一个元素）
+            // MyBatis内部统一返回List（selectOne 内部也是走 selectList 再取第一个元素）
             if (CollectionUtils.isEmpty(resultList)) {
                 return resultObject;
             }
@@ -60,7 +60,7 @@ public class SensitiveResultSetInterceptor implements Interceptor {
             Object firstItem = resultList.getFirst();
 
             if (firstItem instanceof String) {
-                // 返回值为String列表，且Mapper方法�?@SensitiveData 注解时解�?
+                // 返回值为String列表，且Mapper方法有 @SensitiveData 注解时解密
                 if (Objects.nonNull(methodSensitiveData)) {
                     decryptStringList(resultList);
                 }
@@ -74,13 +74,13 @@ public class SensitiveResultSetInterceptor implements Interceptor {
                 }
             }
         } else {
-            // 理论上MyBatis内部都走List，此处作为兜�?
+            // 理论上MyBatis内部都走List，此处作为兜底
             if (resultObject instanceof String) {
                 if (Objects.nonNull(methodSensitiveData)) {
                     try {
                         resultObject = SensitiveUtil.decrypt((String) resultObject, sensitiveKey);
                     } catch (Exception e) {
-                        log.error("字符串返回值解密失�?", e);
+                        log.error("字符串返回值解密失败.", e);
                     }
                 }
             } else {
@@ -104,7 +104,7 @@ public class SensitiveResultSetInterceptor implements Interceptor {
                 try {
                     list.set(i, SensitiveUtil.decrypt(strVal, sensitiveKey));
                 } catch (Exception e) {
-                    log.error("list第[{}]值解密失�?", i, e);
+                    log.error("list第[{}]值解密失败.", i, e);
                 }
             }
         }
@@ -141,8 +141,8 @@ public class SensitiveResultSetInterceptor implements Interceptor {
     }
 
     /**
-     * 判断是否需要解密处�?br>
-     * 逻辑：对象上是否�?@SensitiveData 注解
+     * 判断是否需要解密处理<br>
+     * 逻辑：对象上是否有 @SensitiveData 注解
      */
     private boolean needToDecrypt(Object object) {
         Class<?> objectClass = object.getClass();

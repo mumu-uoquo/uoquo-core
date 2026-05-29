@@ -23,10 +23,10 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 描述：登录用户信息拦�? <br>
- * 背景：从网关传入的用户信�? <br>
- * 日期�?018-01-25 11:13 <br>
- * 变更�?
+ * 描述：登录用户信息拦截. <br>
+ * 背景：从网关传入的用户信息. <br>
+ * 日期：2018-01-25 11:13 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -40,7 +40,7 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
     @Override
     public boolean preHandle(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler)
             throws Exception {
-        // 如果是跨域的OPTIONS请求，放�?
+        // 如果是跨域的OPTIONS请求，放行
         if (HttpMethod.OPTIONS.name().equalsIgnoreCase(request.getMethod())) {
             return true;
         }
@@ -61,10 +61,10 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
                 String path = request.getRequestURI();
                 unsigned = RedisUtil.existSetItem(BaseCacheKey.GLOBAL_UNSIGNED, path);
             }
-            // 免签的或者经过网关签名的请求，才从请求头中获取用户信�?
-            // 即：只信任网关放入请求头的用户信息，防止前端私自放入用户信息，绕过登�?
+            // 免签的或者经过网关签名的请求，才从请求头中获取用户信息
+            // 即：只信任网关放入请求头的用户信息，防止前端私自放入用户信息，绕过登录
             if (unsigned || this.checkGatewayParams(request)) {
-                log.debug("从Redis中获取用户信息失败，从请求头中获取用户信�?");
+                log.debug("从Redis中获取用户信息失败，从请求头中获取用户信息.");
                 user = this.getUserInfo4Request(request);
             }
         }
@@ -109,7 +109,7 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
         try {
             return Long.parseLong(val);
         } catch (Exception e) {
-            log.warn("转换字符串[{}]为Long时出�?", val, e);
+            log.warn("转换字符串[{}]为Long时出错.", val, e);
             return null;
         }
     }
@@ -129,7 +129,7 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
             log.warn("网关时间为空.");
             return false;
         }
-        // 客户端签名信�?
+        // 客户端签名信息
         String reqAppSign = WebUtil.getHeader(CurrentUser.SIGN_APP, request);
         if (StringUtil.isNull(reqAppSign)) {
             log.warn("应用签名为空.");
@@ -172,12 +172,12 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
         if (StringUtil.notNull(nname)) {
             user.setNickName(URLDecoder.decode(nname, StandardCharsets.UTF_8));
         }
-        // 用户所属机�?
+        // 用户所属机构
         String institue = request.getHeader(CurrentUser.USER_INSTITUTE_ID);
         if (StringUtil.notNull(institue)) {
             user.setInstituteId(institue);
         }
-        // 用户所属科�?
+        // 用户所属科室
         String officeId = request.getHeader(CurrentUser.USER_OFFICE_ID);
         if (StringUtil.notNull(officeId)) {
             user.setOfficeId(officeId);
@@ -187,17 +187,17 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
         if (StringUtil.notNull(roleId)) {
             user.setCurrentRoleId(roleId);
         }
-        // 用户所有角�?
+        // 用户所有角色
         String roles = request.getHeader(CurrentUser.USER_ROLE_LIST);
         if (StringUtil.notNull(roles)) {
             user.setRoleList(JsonUtil.deserializeAsList(roles, String.class));
         }
-        // 用户管理的科�?
+        // 用户管理的科室
         String offices = request.getHeader(CurrentUser.USER_OFFICE_LIST);
         if (StringUtil.notNull(offices)) {
             user.setOfficeList(JsonUtil.deserializeAsList(offices, String.class));
         }
-        // 所属的用户�?
+        // 所属的用户组
         String groups = request.getHeader(CurrentUser.USER_GROUP_LIST);
         if (StringUtil.notNull(groups)) {
             user.setGroupList(JsonUtil.deserializeAsList(groups, String.class));
@@ -212,7 +212,7 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
     private CurrentUser.UserInfo getUserInfo4Redis(HttpServletRequest request) {
         String token = WebUtil.getHeader(CurrentUser.TOKEN, request);
         if (StringUtil.notNull(token)) {
-            // 2025-03-05：此处不能用RedisUtil.getLocalCache，因为后续有setNonce等赋值操作，若从缓存获取，容易影响前一个请�?
+            // 2025-03-05：此处不能用RedisUtil.getLocalCache，因为后续有setNonce等赋值操作，若从缓存获取，容易影响前一个请求
             return RedisUtil.get(BaseCacheKey.USER_INFO_PREFIX + token, CurrentUser.UserInfo.class);
         }
         return null;

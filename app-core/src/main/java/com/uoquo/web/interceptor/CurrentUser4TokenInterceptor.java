@@ -17,10 +17,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * 描述：登录用户信息拦�? <br>
- * 背景：通过token到redis中获取用户信�? <br>
- * 日期�?018-01-25 11:13 <br>
- * 变更�?
+ * 描述：登录用户信息拦截. <br>
+ * 背景：通过token到redis中获取用户信息. <br>
+ * 日期：2018-01-25 11:13 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -35,7 +35,7 @@ public class CurrentUser4TokenInterceptor extends CurrentUserInterceptorAdapter 
     @Override
     public boolean preHandle(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler)
             throws Exception {
-        // 如果是跨域的OPTIONS请求，放�?
+        // 如果是跨域的OPTIONS请求，放行
         if (HttpMethod.OPTIONS.name().equalsIgnoreCase(request.getMethod())) {
             return true;
         }
@@ -59,7 +59,7 @@ public class CurrentUser4TokenInterceptor extends CurrentUserInterceptorAdapter 
         // 3.2 根据token填充用户信息
         String token = WebUtil.getHeader(CurrentUser.TOKEN, request);
         if (StringUtil.notNull(token)) {
-            // 2025-03-05：此处不能用RedisUtil.getLocalCache，因为后续有setNonce等赋值操作，若从缓存获取，容易影响前一个请�?
+            // 2025-03-05：此处不能用RedisUtil.getLocalCache，因为后续有setNonce等赋值操作，若从缓存获取，容易影响前一个请求
             CurrentUser.UserInfo user = RedisUtil.get(BaseCacheKey.USER_INFO_PREFIX + token, CurrentUser.UserInfo.class);
             if (user != null) {
                 CurrentUser.setInfo(user);

@@ -46,10 +46,10 @@ import org.springframework.util.TypeUtils;
 import org.springframework.web.client.HttpMessageConverterExtractor;
 
 /**
- * 描述：feign接收数据后的解码�? <br>
+ * 描述：feign接收数据后的解码器. <br>
  * 背景：需优先拦截服务提供者返回的是否是异常信息，不是异常信息才走spring的解码器. <br>
- * 日期�?018-01-24 17:18 <br>
- * 变更�?
+ * 日期：2018-01-24 17:18 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -77,7 +77,7 @@ public class FeignDecoder extends SpringDecoder {
         if (isStreamResponse(response)) {
             return handleStreamResponse(response, type);
         }
-        // TODO 需要测试接口返回错误时，void 类型的方法是否正�?
+        // TODO 需要测试接口返回错误时，void 类型的方法是否正常
         // 2. 获取响应体并记录耗时
         long bgn = System.currentTimeMillis();
         String responseText = getResponse(response);
@@ -86,7 +86,7 @@ public class FeignDecoder extends SpringDecoder {
             String mesg = String.format("get response time=%.3fs, body:%s", (end - bgn) / 1_000F, responseText);
             log.debug(mesg);
         }
-        // 3. 空响应处�?
+        // 3. 空响应处理
         if (StringUtil.isNull(responseText)) {
             return null;
         }
@@ -126,7 +126,7 @@ public class FeignDecoder extends SpringDecoder {
     }
 
     /**
-     * 判断是否流响�?
+     * 判断是否流响应
      */
     private boolean isStreamResponse(Response response) {
         // 获取Content-Type头（忽略大小写）
@@ -152,7 +152,7 @@ public class FeignDecoder extends SpringDecoder {
             return null;
         }
 
-        // 根据目标类型返回不同结果（支持byte[]、InputStream、Resource�?
+        // 根据目标类型返回不同结果（支持byte[]、InputStream、Resource）
         if (type instanceof Class<?> targetClass) {
             if (byte[].class.equals(targetClass)) {
                 // 返回字节数组（一次性读取，适合小文件）
@@ -161,7 +161,7 @@ public class FeignDecoder extends SpringDecoder {
                 // 返回输入流（需调用方自行关闭，适合大文件）
                 return body.asInputStream();
             } else if (Resource.class.isAssignableFrom(targetClass)) {
-                // 返回Spring Resource（自动管理流关闭�?
+                // 返回Spring Resource（自动管理流关闭）
                 return new InputStreamResource(body.asInputStream());
             }
         }
@@ -176,7 +176,7 @@ public class FeignDecoder extends SpringDecoder {
      * 获取响应内容.
      * @param response 响应对象
      * @return 响应内容
-     * @throws IOException 数据流异�?
+     * @throws IOException 数据流异常
      */
     private String getResponse(Response response) throws IOException {
         if (response.body() == null) {
@@ -189,7 +189,7 @@ public class FeignDecoder extends SpringDecoder {
     }
     
     /**
-     * 异常检�?
+     * 异常检测.
      * @param data 响应信息
      * @throws AbstractBaseException 异常信息
      */
@@ -250,7 +250,7 @@ public class FeignDecoder extends SpringDecoder {
             if (this.responseText instanceof String) {
                 bout.writeBytes(((String) this.responseText).getBytes(this.response.charset()));
             } else {
-                // ObjectOutputStream.writeStreamHeader 会添�?字节头信�?
+                // ObjectOutputStream.writeStreamHeader 会添加4字节头信息
                 ObjectOutputStream out = new ObjectOutputStream(bout);
                 out.writeObject(this.responseText);
                 out.close();

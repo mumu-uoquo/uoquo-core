@@ -14,10 +14,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * 描述：登录用户信息拦�? <br>
- * 背景：用于获取从session中获取用户信�? <br>
- * 日期�?018-01-25 11:13 <br>
- * 变更�?
+ * 描述：登录用户信息拦截. <br>
+ * 背景：用于获取从session中获取用户信息. <br>
+ * 日期：2018-01-25 11:13 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -32,7 +32,7 @@ public class CurrentUser4SessionInterceptor extends CurrentUserInterceptorAdapte
     @Override
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler)
             throws Exception {
-        // 如果是跨域的OPTIONS请求，放�?
+        // 如果是跨域的OPTIONS请求，放行
         if (HttpMethod.OPTIONS.name().equalsIgnoreCase(request.getMethod())) {
             return true;
         }

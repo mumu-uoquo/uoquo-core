@@ -32,9 +32,9 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 描述：登录检测（仅独立应用需要，微服务在网关层已经做校验了）. <br>
- * 背景：用于判断URL是否需要登录处�? <br>
- * 日期�?018-01-25 11:13 <br>
- * 变更�?
+ * 背景：用于判断URL是否需要登录处理. <br>
+ * 日期：2018-01-25 11:13 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -50,12 +50,12 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler)
             throws Exception {
-        // 如果是跨域的OPTIONS请求，放�?
+        // 如果是跨域的OPTIONS请求，放行
         if (HttpMethod.OPTIONS.name().equalsIgnoreCase(request.getMethod())) {
             return true;
         }
         // 1. 免登过滤
-        // 1.1 内部出错时的跳转不处�?
+        // 1.1 内部出错时的跳转不处理
         Throwable error = (Throwable)request.getAttribute(DefaultErrorAttributes.class.getName() + ".ERROR");
         if (error != null) {
             return true;
@@ -66,12 +66,12 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
             log.debug("[{}]注解[ignore all]跳过登录校验.", path);
             return true;
         }
-        // 如果是内部微服务 FEIGN 发起的调用，则不需要登录认证�?
+        // 如果是内部微服务 FEIGN 发起的调用，则不需要登录认证。
         if (isFeignRequest(request)) {
             log.debug("[{}]内部微服务调用[appkey={}]免登.", path, CurrentUser.getAppkey());
             return true;
         }
-        // 1.2 免登陆校验（如登录、下载等接口�?
+        // 1.2 免登陆校验（如登录、下载等接口）
         if (ignoreAuth.login() || path.endsWith("/login")) {
             log.debug("[{}]注解[ignore login]跳过登录校验.", path);
             return true;
@@ -81,7 +81,7 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
             log.debug("[{}]全局免登.", path);
             return true;
         }
-        // 1.3 部分业务（如：下载）可以不校验登�?
+        // 1.3 部分业务（如：下载）可以不校验登陆
         boolean unsigned = RedisUtil.existSetItem(BaseCacheKey.GLOBAL_UNSIGNED, path);
         if (unsigned) {
             log.debug("[{}]全局免签.", path);
@@ -91,9 +91,9 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
         // 第三方平台（appkey）对接也改造为先获取token，再访问业务的逻辑
         String token = CurrentUser.getToken();
         CurrentUser.UserInfo user = CurrentUser.getInfo();
-//        // 第三方应用权限判断（方法1：不登录获取token，只判断资源授权�?
+//        // 第三方应用权限判断（方法1：不登录获取token，只判断资源授权）
 //        if (user == null || StringUtil.isNull(user.getUserId())) {
-//            // 若是第三方发起的调用，此时跟用户无关，仅需判断应用的权�?
+//            // 若是第三方发起的调用，此时跟用户无关，仅需判断应用的权限
 //            accept = RedisUtil.existSetItem(BaseCacheKey.APPKEY_PERMISSION_PREFIX + CurrentUser.getAppkey(), path);
 //            if (accept) {
 //                log.debug("[{}]独立授权[{}].", path, CurrentUser.getAppkey());
@@ -102,7 +102,7 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
 //            if (StringUtil.isNull(token)) {
 //                throw new ForbiddenException();
 //            } else {
-//                // 有token，却无用户信息，说明token已失�?
+//                // 有token，却无用户信息，说明token已失效
 //                throw new TokenInvalidException();
 //            }
 //        }
@@ -111,7 +111,7 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
         if (StringUtil.isNull(token)) {
             throw new TokenEmptyException();
         }
-        // 3.1 应用授权判断（方�?：需登录获取token，并判断资源授权�?
+        // 3.1 应用授权判断（方法2：需登录获取token，并判断资源授权）
         String appToken = RedisUtil.get(BaseCacheKey.APPKEY_TOKEN_PREFIX + CurrentUser.getAppkey(), String.class);
         if (StringUtil.notNull(appToken) && token.equals(appToken)) {
             accept = RedisUtil.existSetItem(BaseCacheKey.APPKEY_PERMISSION_PREFIX + CurrentUser.getAppkey(), path);
@@ -124,7 +124,7 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
         }
         // 3.2 用户授权判断（是否被踢）
         if (user == null || StringUtil.isNull(user.getUserId())) {
-            // 有token，却无用户信息，说明token已失�?
+            // 有token，却无用户信息，说明token已失效
             // TODO 产生超时事件，并通知
             throw new TokenInvalidException();
         }
@@ -134,16 +134,16 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
             log.warn("用户[{}]缓存的登录token为空，用当前token[{}]补充.", user.getUserId(), token);
             RedisUtil.put(loginTokenCacheKey, token, user.getExpires());
         } else if (!token.equals(loginToken)) {
-            log.debug("用户[{}]的请求token[{}]不是最新的登录token[{}]，所以当前的客户端已经被踢下�?", user.getUserId(), loginToken, token);
+            log.debug("用户[{}]的请求token[{}]不是最新的登录token[{}]，所以当前的客户端已经被踢下线.", user.getUserId(), loginToken, token);
             // 传入的token与最新缓存的token不一致，说明被踢下线了（在被踢时已经发布过事件，此处不重复发送）
             RedisUtil.clearLocalCache(BaseCacheKey.USER_INFO_PREFIX + token);
             throw new AccountKickOutException();
         }
         // 3.3 用户授权判断（校验权限）
         if (path.endsWith("/permission") || path.endsWith("/logout")) {
-            // 清理本地缓存的用户信息（授权接口会重新设置缓存的用户信息�?
+            // 清理本地缓存的用户信息（授权接口会重新设置缓存的用户信息）
             RedisUtil.clearLocalCache(BaseCacheKey.USER_INFO_PREFIX + token);
-            // 清理本地所有缓存（从而减少定时清理的逻辑�?
+            // 清理本地所有缓存（从而减少定时清理的逻辑）
             RedisUtil.clearLocalCache();
         } else if (RedisUtil.existSetItem(BaseCacheKey.GLOBAL_ALL_RESOURCE, path)) {
             // 权限校验（登记到系统中的resource必须授权后才能访问）
@@ -153,7 +153,7 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
             }
         }
 //        // 2025-11-08：不再自动刷新，改由请求方采用freshToken机制无感刷新，从而减少服务端对redis的操作，以及减少token泄露后的隐患
-//        // 4 更新缓存时间（默�?0 * 60秒）
+//        // 4 更新缓存时间（默认30 * 60秒）
 //        if (user.getExpires() != null && ignoreAuth.refreshExpiresTime()) {
 //            int timeout = user.getExpires() == 0 ? 1800 : user.getExpires();
 //            RedisUtil.expire(BaseCacheKey.USER_INFO_PREFIX + token, timeout);
@@ -166,10 +166,10 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
      * 判断是否是内部微服务调用.
      */
     private boolean isFeignRequest(HttpServletRequest request) {
-        // feign �?gateway 的参数必须是请求头中
+        // feign 和 gateway 的参数必须是请求头中
         String feignSign = request.getHeader(CurrentUser.FEIGN_SIGN);
         String signGlobal = request.getHeader(CurrentUser.GATEWAY_SIGN);
-        // 前端的签名可能在url�?
+        // 前端的签名可能在url中
         String signParams = WebUtil.getHeader(CurrentUser.SIGN_APP, request);
         if (StringUtil.notNull(feignSign) && StringUtil.notNull(signGlobal) && StringUtil.notNull(signParams)) {
             String calcFeignSign = SignParamUtil.sign(signParams + signGlobal, CurrentUser.getGlobalSecret());

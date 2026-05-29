@@ -12,8 +12,8 @@ import org.apache.ibatis.cache.CacheKey;
 
 /**
  * 描述：Oracle分页. <br>
- * 日期�?018-04-02 15:15 <br>
- * 变更�?
+ * 日期：2018-04-02 15:15 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -27,7 +27,7 @@ public class OracleDialect extends Dialect {
 
     @Override
     public String getPageSql(String sql, PageList<?> page, CacheKey cacheKey) {
-        // �?for update 单独拼接
+        // 将 for update 单独拼接
         boolean isForUpdate = false;
         if (sql.toLowerCase().endsWith(" for update")) {
             sql = sql.substring(0, sql.length() - 11);

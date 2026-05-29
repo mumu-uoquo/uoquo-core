@@ -48,18 +48,18 @@ import org.springframework.web.servlet.ModelAndView;
 
 /**
  * 描述：全局异常处理（请求转发）.<br>
- * 说明：响应码�?200，方便前端统一处理
+ * 说明：响应码为 200，方便前端统一处理
  * <pre>
  * 优点：能捕获 404、过滤器、拦截器、控制器、参数绑定等错误.
- * 缺点�?
+ * 缺点：
  *     1. 因为是请求转发，所以无法拿到请求的入参信息
- *     2. �?404 外，其他异常都会触发 “ContainerBase.[Tomcat]�?的错误输出，导致日志记录双份.
- * 用法：作为全局异常处理的补偿机制，配合 GlobalExceptionResolver �?GlobalExceptionHandler
+ *     2. 除 404 外，其他异常都会触发 “ContainerBase.[Tomcat]” 的错误输出，导致日志记录双份.
+ * 用法：作为全局异常处理的补偿机制，配合 GlobalExceptionResolver 或 GlobalExceptionHandler
  * 资料：https://blog.csdn.net/weixin_36380516/article/details/132506064
  * </pre>
- * 参考：{@link org.springframework.boot.autoconfigure.web.servlet.error.BasicErrorController}的处�?br>
- * 日期�?018-03-20 15:13 <br>
- * 变更�?
+ * 参考：{@link org.springframework.boot.autoconfigure.web.servlet.error.BasicErrorController}的处理<br>
+ * 日期：2018-03-20 15:13 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -69,7 +69,6 @@ import org.springframework.web.servlet.ModelAndView;
  * @version 1.0
  * @author  uoquo team
  */
-//@ApiIgnore
 @Hidden
 @RestController
 @RequestMapping("${server.error.path:${error.path:/error}}")
@@ -97,7 +96,7 @@ public class GlobalExceptionController extends AbstractErrorController {
 
     @PostConstruct
     public void init() {
-        // 为了不暴露服务器IP，只留服务器IP的最后一�?
+        // 为了不暴露服务器IP，只留服务器IP的最后一位
         int idx = serverIp.lastIndexOf(".");
         if (StringUtil.notNull(serverIp) && (idx > -1)) {
             serverIp = serverIp.substring(idx + 1);
@@ -128,11 +127,11 @@ public class GlobalExceptionController extends AbstractErrorController {
         // TODO 由于是转发请求，需想办法拿到请求体数据
         String reqBody = null;
 
-        // 获取真正的错误信�?
+        // 获取真正的错误信息
         Throwable error = this.getError(request, status, mesg);
         AbstractBaseException ex;
-        if (error instanceof RemoteServiceException    // 其他服务抛出的异�?
-                || error instanceof ForbiddenException // 无权操作的异�?
+        if (error instanceof RemoteServiceException    // 其他服务抛出的异常
+                || error instanceof ForbiddenException // 无权操作的异常
         ) {
             // 此时需要记录异常的堆栈详情
             ex = (AbstractBaseException) error;
@@ -140,7 +139,7 @@ public class GlobalExceptionController extends AbstractErrorController {
                     requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
                     clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, ex.getTrace());
         } else if (error instanceof AbstractBaseException) {
-            // 如果是自定义其他异常，不记录详细的异常信�?
+            // 如果是自定义其他异常，不记录详细的异常信息
             ex = (AbstractBaseException) error;
             if (log.isDebugEnabled()) {
                 log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .\n{}",
@@ -165,7 +164,7 @@ public class GlobalExceptionController extends AbstractErrorController {
                     clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, error);
         } else if (error instanceof ConstraintViolationException) {
             // FORM入参校验失败
-            // TODO 后续是否可以拿到具体的字�?
+            // TODO 后续是否可以拿到具体的字段
             ex = new ParamErrorException(error);
             log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
                     requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
@@ -196,7 +195,7 @@ public class GlobalExceptionController extends AbstractErrorController {
             tracePrefix.append("traceId: ").append(CurrentUser.getTraceId()).append("\n");
             ex.setTrace(tracePrefix.toString());
         }
-        // 增加错误码到响应头，主要用于响应内容为文件流的接�?
+        // 增加错误码到响应头，主要用于响应内容为文件流的接口
         response.setHeader("response-code", ex.getStatus());
         return  new ReturnData<>(ex);
     }
@@ -206,7 +205,7 @@ public class GlobalExceptionController extends AbstractErrorController {
         Throwable error = this.errorAttributes.getError(new ServletWebRequest(request));
         if (error == null) {
             error = getAttribute(new ServletRequestAttributes(request), "jakarta.servlet.error.exception");
-            // 如果�?03�?04一类，将获取不到错误信息，此时根据请求头调�?
+            // 如果是403、404一类，将获取不到错误信息，此时根据请求头调整
             if (error == null) {
                 status = (status == null) ? 500 : status;
                 if (status == 403) {

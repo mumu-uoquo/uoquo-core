@@ -36,13 +36,13 @@ import java.util.TreeMap;
 
 /**
  * 描述：全局异常处理（拦截器、业务异常、入参绑定）.<br>
- * 说明：响应码�?200，方便前端统一处理
+ * 说明：响应码为 200，方便前端统一处理
  * <pre>
- * 优点�?
- *     1. 能捕�?拦截器、控制器、参数绑定等错误.
+ * 优点：
+ *     1. 能捕获 拦截器、控制器、参数绑定等错误.
  *     2. 可以获取请求时的参数
- * 缺点：无法捕�?404、过滤器的错�?
- * 用法：作为全局异常的主处理方法，在配置类中�?@Bean 注解进行初始化注入，�?GlobalExceptionController 作补�?
+ * 缺点：无法捕获 404、过滤器的错误.
+ * 用法：作为全局异常的主处理方法，在配置类中用 @Bean 注解进行初始化注入，由 GlobalExceptionController 作补偿
  * 资料：https://blog.csdn.net/weixin_36380516/article/details/132506064
  * </pre>
  */
@@ -62,7 +62,7 @@ public class GlobalExceptionResolver extends ExceptionHandlerExceptionResolver {
 
     @PostConstruct
     public void init() {
-        // 为了不暴露服务器IP，只留服务器IP的最后一�?
+        // 为了不暴露服务器IP，只留服务器IP的最后一位
         int idx = serverIp.lastIndexOf(".");
         if (StringUtil.notNull(serverIp) && (idx > -1)) {
             serverIp = serverIp.substring(idx + 1);
@@ -82,21 +82,21 @@ public class GlobalExceptionResolver extends ExceptionHandlerExceptionResolver {
         String userInfo = JsonUtil.serialize(user);
         // 请求参数
         TreeMap<String, Object> params = WebUtil.getRequestParams(request);
-        // 请求体（去掉文件�?
+        // 请求体（去掉文件）
         String reqBody = null;
         String contentType = request.getHeader("Content-Type");
         contentType = (contentType == null) ? "" : contentType.toLowerCase();
         if (!contentType.startsWith("multipart/form-data") && !contentType.startsWith("application/octet-stream")) {
             reqBody = WebUtil.getRequestBody(request);
-            // INFO只记�?000字符以内的数据（便于以后查问题，此处放开�?
+            // INFO只记录1000字符以内的数据（便于以后查问题，此处放开）
 //            if ((body.length() > 1000) && !log.isDebugEnabled()) {
 //                body = body.substring(0, 1000) + "...";
 //            }
         }
         // 2. 格式化错误信息及日志记录
         AbstractBaseException ex;
-        if (error instanceof RemoteServiceException         // 其他服务抛出的异�?
-                || error instanceof SystemErrorException    // 无权操作的异�?
+        if (error instanceof RemoteServiceException         // 其他服务抛出的异常
+                || error instanceof SystemErrorException    // 无权操作的异常
         ) {
             // 此时需要记录异常的堆栈详情
             ex = (AbstractBaseException) error;
@@ -104,7 +104,7 @@ public class GlobalExceptionResolver extends ExceptionHandlerExceptionResolver {
                     requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
                     clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, ex.getTrace());
         } else if (error instanceof AbstractBaseException) {
-            // 如果是自定义其他异常，不记录详细的异常堆栈信�?
+            // 如果是自定义其他异常，不记录详细的异常堆栈信息
             ex = (AbstractBaseException) error;
             if (log.isDebugEnabled()) {
                 log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .\n{}",
@@ -129,7 +129,7 @@ public class GlobalExceptionResolver extends ExceptionHandlerExceptionResolver {
                     clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, error);
         } else if (error instanceof ConstraintViolationException) {
             // FORM入参校验失败
-            // TODO 后续是否可以拿到具体的字�?
+            // TODO 后续是否可以拿到具体的字段
             ex = new ParamErrorException(error);
             log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
                     requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
@@ -158,7 +158,7 @@ public class GlobalExceptionResolver extends ExceptionHandlerExceptionResolver {
                 tracePrefix.append("traceId: ").append(CurrentUser.getTraceId()).append("\n");
                 ex.setTrace(tracePrefix.toString());
             }
-            // 增加错误码到响应头，主要用于响应内容为文件流的接�?
+            // 增加错误码到响应头，主要用于响应内容为文件流的接口
             response.setHeader("response-code", ex.getStatus());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());

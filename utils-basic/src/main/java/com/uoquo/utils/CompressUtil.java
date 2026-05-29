@@ -5,7 +5,6 @@
 
 package com.uoquo.utils;
 
-import com.uoquo.utils.ecg.DataUtil;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;

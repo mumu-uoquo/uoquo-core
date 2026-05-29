@@ -4,7 +4,7 @@
  */
 package com.uoquo.utils.crypto;
 
-import com.uoquo.utils.ecg.DataUtil;
+import com.uoquo.utils.DataUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

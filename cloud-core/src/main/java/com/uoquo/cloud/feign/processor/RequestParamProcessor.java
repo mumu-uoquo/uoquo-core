@@ -24,10 +24,10 @@ import org.springframework.cloud.openfeign.AnnotatedParameterProcessor;
 import org.springframework.web.bind.annotation.RequestBody;
 
 /**
- * 描述：将YocalyParam注解按自定义格式放入requestBody�? <br>
- * 注意：yocaly的BaseEntity、map、array、collection这几种类型不允许传null�?
- * 日期�?018-03-11 02:01 <br>
- * 变更�?
+ * 描述：将YocalyParam注解按自定义格式放入requestBody中. <br>
+ * 注意：yocaly的BaseEntity、map、array、collection这几种类型不允许传null值
+ * 日期：2018-03-11 02:01 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -49,7 +49,7 @@ public class RequestParamProcessor implements AnnotatedParameterProcessor {
     @Override
     public boolean processArgument(AnnotatedParameterContext context, Annotation annotation, Method method) {
         int parameterIndex = context.getParameterIndex();
-        // 参数�?
+        // 参数名
         RequestParam requestParam = ANNOTATION.cast(annotation);
         String name = requestParam.value();
         checkState(emptyToNull(name) != null,
@@ -60,7 +60,7 @@ public class RequestParamProcessor implements AnnotatedParameterProcessor {
     }
     
     /**
-     * 设置BodyTemplate，即 @Body 标签的�?<br>
+     * 设置BodyTemplate，即 @Body 标签的值.<br>
      * @param context  注解信息
      * @param name     参数名称
      * @param paramIdx 参数序号
@@ -75,19 +75,19 @@ public class RequestParamProcessor implements AnnotatedParameterProcessor {
             for (Annotation[] anos : method.getParameterAnnotations()) {
                 for (Annotation ano : anos) {
                     checkState(!(ano instanceof RequestBody),
-                            "on method %s 参数注解冲突：YocalyParam, Param �?org.springframework.web.bind.annotation.RequestBody 只能同时有一�?,
+                            "on method %s 参数注解冲突：YocalyParam, Param 与 org.springframework.web.bind.annotation.RequestBody 只能同时有一个",
                             method);
                 }
                 if (anos.length > 0) {
                     annotNum++;
                 }
             }
-            // 检测是否所有参数都有注�?
+            // 检测是否所有参数都有注解
             int paramNum = method.getParameterCount();
             checkState(paramNum == annotNum,
-                    "on method %s 所有参数都必须有注�?,
+                    "on method %s 所有参数都必须有注解",
                     method);
-            // 设置bodyIndex，由feign检测，但会导致传递的参数不对，需要看看源码bodyIdex表示什么意�?
+            // 设置bodyIndex，由feign检测，但会导致传递的参数不对，需要看看源码bodyIdex表示什么意思
             // data.bodyIndex(paramIdx);
             bodyTpl = "%7B%7D"; // 即：bodyTpl = "{}"
         }
@@ -102,14 +102,14 @@ public class RequestParamProcessor implements AnnotatedParameterProcessor {
             }
         } else if (Number.class.isAssignableFrom(parameterType) 
                 || Boolean.class.isAssignableFrom(parameterType)) {
-            // 数字及布尔类�?
+            // 数字及布尔类型
             bodyTpl = bodyTpl.replaceAll("%7D", ", \"" + name + "\": \"{" + name + "}\"%7D"); // 带双引号
         } else if (BaseEntity.class.isAssignableFrom(parameterType)
                 || Map.class.isAssignableFrom(parameterType)
                 || Collection.class.isAssignableFrom(parameterType)
                 || Array.class.isAssignableFrom(parameterType)) {
-            // 自定义的pojo类型、map、集合、数组类�?
-            // 注意：不可以为null，否则解析端会报�?
+            // 自定义的pojo类型、map、集合、数组类型
+            // 注意：不可以为null，否则解析端会报错
             bodyTpl = bodyTpl.replaceAll("%7D", ", \"" + name + "\": {" + name + "}%7D");
         } else {
             // 字符串及其他类型
@@ -117,10 +117,10 @@ public class RequestParamProcessor implements AnnotatedParameterProcessor {
         }
         
         /* ***************************************** *
-         * TODO 如果feignd的方法能处理null，则拼接的body的json模板可以不带双引�?
-         * （详见feign�?RequestTemplate feign.ReflectiveFeign.BuildTemplateByResolvingArgs.create(Object[] argv)�?
+         * TODO 如果feignd的方法能处理null，则拼接的body的json模板可以不带双引号
+         * （详见feign的 RequestTemplate feign.ReflectiveFeign.BuildTemplateByResolvingArgs.create(Object[] argv)）
          * ***************************************** */
-        //bodyTpl = bodyTpl.replaceAll("%7D", ", \"" + name + "\": {" + name + "}%7D"); // 当数据为null时，会报�?
+        //bodyTpl = bodyTpl.replaceAll("%7D", ", \"" + name + "\": {" + name + "}%7D"); // 当数据为null时，会报错
         bodyTpl = bodyTpl.replaceAll("%7B, ", "%7B");
         data.template().bodyTemplate(bodyTpl);
         data.indexToExpander().put(paramIdx, new ToJsonExpander());

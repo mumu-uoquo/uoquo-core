@@ -28,10 +28,10 @@ import java.time.Clock;
 import java.time.Duration;
 
 /**
- * 描述：参数检�? <br>
+ * 描述：参数检测. <br>
  * 背景：判断传入的参数是否被篡改，需要在CurrentUser拦截之后. <br>
- * 日期�?018-01-25 11:13 <br>
- * 变更�?
+ * 日期：2018-01-25 11:13 <br>
+ * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
@@ -44,18 +44,18 @@ import java.time.Duration;
 public class CheckParamInterceptor implements HandlerInterceptor {
     protected final Logger log = LoggerFactory.getLogger(getClass());
 
-    // 时间戳有效时间（默认5分钟�?
+    // 时间戳有效时间（默认5分钟）
     protected static final Duration TIMESTAMP_MAX = Duration.ofSeconds(5 * 60);
 
     @Override
     public boolean preHandle(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler)
             throws Exception {
-        // 如果是跨域的OPTIONS请求，放�?
+        // 如果是跨域的OPTIONS请求，放行
         if (HttpMethod.OPTIONS.name().equalsIgnoreCase(request.getMethod())) {
             return true;
         }
         // 1. 免签过滤
-        // 1.1 内部出错时的跳转不处理（理论上不应该有这个判断，应该交由拦截器注入的地方配置�?
+        // 1.1 内部出错时的跳转不处理（理论上不应该有这个判断，应该交由拦截器注入的地方配置）
         Throwable error = (Throwable)request.getAttribute(DefaultErrorAttributes.class.getName() + ".ERROR");
         if (error != null) {
             return true;
@@ -66,13 +66,13 @@ public class CheckParamInterceptor implements HandlerInterceptor {
             log.debug("[{}]注解[ignore all]跳过参数签名校验.", path);
             return true;
         }
-        // 1.2 部分业务（如：下载）可以不校验签�?
+        // 1.2 部分业务（如：下载）可以不校验签名
         boolean unsigned = RedisUtil.existSetItem(BaseCacheKey.GLOBAL_UNSIGNED, path);
         if (unsigned) {
             log.debug("[{}]全局免签.", path);
             return true;
         }
-        // 内部微服务调用判�?
+        // 内部微服务调用判断
         boolean feignRequest = isFeignRequest(request);
         if (ignoreAuth.inner()) {
             // 如果标注为内部接口，则只能由内部微服务FEIGN发起调用
@@ -80,19 +80,19 @@ public class CheckParamInterceptor implements HandlerInterceptor {
                 log.warn("内部接口[{}]被[{}]调用.", path, CurrentUser.getClientIp());
                 throw new ForbiddenException("无权调用内部接口");
             }
-            // 内部微服�?FEIGN 发起的调用，不需要验签�?
+            // 内部微服务 FEIGN 发起的调用，不需要验签。
             return true;
         } else if (feignRequest) {
-            // 内部微服�?FEIGN 发起的调用，不需要验签�?
+            // 内部微服务 FEIGN 发起的调用，不需要验签。
             log.debug("[{}]内部微服务调用[appkey={}]免签.", path, CurrentUser.getAppkey());
             return true;
         }
         // 2. 参数校验
-        // 2.1 时间戳校�?
+        // 2.1 时间戳校验
         if (!ignoreAuth.timestamp()) {
             this.checkTimestamp(request);
         } else if (log.isDebugEnabled()) {
-            log.debug("[{}]注解[ignore timestamp]跳过时间戳校�?", path);
+            log.debug("[{}]注解[ignore timestamp]跳过时间戳校验.", path);
         }
         // 2.2 防重提交校验
         this.checkResubmit(request);
@@ -109,10 +109,10 @@ public class CheckParamInterceptor implements HandlerInterceptor {
      * 判断是否是内部微服务调用.
      */
     protected boolean isFeignRequest(HttpServletRequest request) {
-        // feign �?gateway 的参数必须是请求头中
+        // feign 和 gateway 的参数必须是请求头中
         String feignSign = request.getHeader(CurrentUser.FEIGN_SIGN);
         String signGlobal = request.getHeader(CurrentUser.GATEWAY_SIGN);
-        // 前端的签名可能在url�?
+        // 前端的签名可能在url中
         String signParams = WebUtil.getHeader(CurrentUser.SIGN_APP, request);
         if (StringUtil.notNull(feignSign) && StringUtil.notNull(signGlobal) && StringUtil.notNull(signParams)) {
             String calcFeignSign = SignParamUtil.sign(signParams + signGlobal, CurrentUser.getGlobalSecret());
@@ -135,10 +135,10 @@ public class CheckParamInterceptor implements HandlerInterceptor {
             throw new ParamSignEmptyException(CurrentUser.NONCE);
         }
         // 防重校验
-        // 20250924：不仅仅校验nonce，防止多个平台的nonce规则一致导致生成的nonce重复，从而误�?
+        // 20250924：不仅仅校验nonce，防止多个平台的nonce规则一致导致生成的nonce重复，从而误判
         String nonceKey = BaseCacheKey.REQUEST_NONCE_PREFIX + CurrentUser.getAppkey() + nonce;
         if (RedisUtil.exist(nonceKey)) {
-            throw new ParamErrorException(String.format("�?%d 秒内不可以重复提�?, TIMESTAMP_MAX.toSeconds()));
+            throw new ParamErrorException(String.format("在 %d 秒内不可以重复提交", TIMESTAMP_MAX.toSeconds()));
         } else {
             RedisUtil.put(nonceKey, reqAppSign, (int)TIMESTAMP_MAX.toSeconds());
             log.debug("防重提交校验成功：nonce=[{}], app-sign=[{}], time=[{}]", nonce, reqAppSign, System.currentTimeMillis());
@@ -146,7 +146,7 @@ public class CheckParamInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * 时间戳校�?
+     * 时间戳校验
      */
     protected void checkTimestamp(HttpServletRequest request) throws Exception {
         String timestr = WebUtil.getHeader(CurrentUser.TIME, request);
@@ -160,7 +160,7 @@ public class CheckParamInterceptor implements HandlerInterceptor {
             log.warn("请求头必须包含正确的请求时间戳：{}", timestr, e);
             throw new ParamSignErrorException(CurrentUser.TIME);
         }
-        // 防止请求端时间偏差，因此取绝对�?
+        // 防止请求端时间偏差，因此取绝对值
         long diffms = Math.abs(Clock.systemUTC().millis() - timestamp);
         if ( diffms > TIMESTAMP_MAX.toMillis() ) {
             log.warn("请求头必须包含正确的请求时间戳：server[{}], request[{}], diff = {} ms", Clock.systemUTC().millis(), timestamp, diffms);
@@ -176,7 +176,7 @@ public class CheckParamInterceptor implements HandlerInterceptor {
         if (StringUtil.isNull(CurrentUser.getAppkey())) {
             throw new AppkeyEmptyException();
         }
-        // 3.2 传入的签�?
+        // 3.2 传入的签名
         String reqAppSign = WebUtil.getHeader(CurrentUser.SIGN_APP, request);
         if (StringUtil.isNull(reqAppSign)) {
             throw new ParamSignEmptyException(CurrentUser.SIGN_APP);
@@ -185,11 +185,11 @@ public class CheckParamInterceptor implements HandlerInterceptor {
         if (StringUtil.isNull(CurrentUser.getLanguage())) {
             throw new ParamSignEmptyException(CurrentUser.USER_LANGUAGE);
         }
-        // 3.4 随机值校�?
+        // 3.4 随机值校验
         if (StringUtil.isNull(CurrentUser.getNonce())) {
             throw new ParamSignEmptyException(CurrentUser.NONCE);
         }
-        // 3.5 机器码校�?
+        // 3.5 机器码校验
         if (StringUtil.isNull(CurrentUser.getDeviceId())) {
             throw new ParamSignEmptyException(CurrentUser.DEVICE_ID);
         }
