@@ -5,38 +5,37 @@
 
 package com.uoquo.web.interceptor;
 
-import com.uoquo.utils.CompressUtil;
-import com.uoquo.utils.IDGenerator;
-import com.uoquo.utils.StringUtil;
-import com.uoquo.utils.json.JsonUtil;
-import com.uoquo.utils.CurrentUser;
-import com.uoquo.web.common.annotation.RequestParamResolver;
-import com.uoquo.web.filter.RepeatedlyHttpServletRequestWrapper;
-import com.uoquo.web.mybatis.page.PageHelper;
-import com.uoquo.web.utils.WebUtil;
-
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
 import org.springframework.http.HttpMethod;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.ContentCachingResponseWrapper;
+
+import com.uoquo.utils.CompressUtil;
+import com.uoquo.utils.CurrentUser;
+import com.uoquo.utils.IDGenerator;
+import com.uoquo.utils.StringUtil;
+import com.uoquo.utils.json.JsonUtil;
+import com.uoquo.web.filter.RepeatedlyHttpServletRequestWrapper;
+import com.uoquo.web.mybatis.page.PageHelper;
+import com.uoquo.web.utils.WebUtil;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 描述：全局拦截器. <br>
@@ -80,8 +79,6 @@ public class GlobalInterceptor implements HandlerInterceptor {
         }
         // 记录请求开始时间
         request.setAttribute(REQUEST_EXECUTE_TIME, System.currentTimeMillis());
-        // 释放自定义参数解析缓存的数据，因为中途有可能进入异常处理，而没有走afterCompletion方法，所以此处再次进行清空
-        request.removeAttribute(RequestParamResolver.REQUEST_PARAMS_TEMP_KEY);
         // 清除线程缓存数据
         PageHelper.clearPage();
         // 记录请求日志
@@ -112,8 +109,6 @@ public class GlobalInterceptor implements HandlerInterceptor {
     public void postHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler, @Nullable ModelAndView modelAndView) 
             throws Exception {
         // spring-session在执行postHandle之后会保存到redis，所以在此处清空所有非必须的数据
-        // 释放自定义参数解析缓存的数据，每次执行完之后都将其清空，释放服务器session占用的空间
-        request.removeAttribute(RequestParamResolver.REQUEST_PARAMS_TEMP_KEY);
     }
 
     /**

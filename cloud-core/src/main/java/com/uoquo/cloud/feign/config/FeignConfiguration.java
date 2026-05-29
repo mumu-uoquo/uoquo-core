@@ -5,22 +5,6 @@
 
 package com.uoquo.cloud.feign.config;
 
-import com.uoquo.cloud.feign.converter.MapFormHttpMessageConverter;
-import com.uoquo.cloud.feign.FeignDecoder;
-import com.uoquo.cloud.feign.FeignEncoder;
-import com.uoquo.cloud.feign.FeignErrorDecoder;
-import com.uoquo.cloud.feign.FeignHeaderInterceptor;
-import com.uoquo.cloud.feign.processor.DateFormatter;
-import com.uoquo.cloud.feign.processor.RequestParamProcessor;
-
-import feign.Contract;
-import feign.Logger;
-import feign.RequestInterceptor;
-import feign.codec.Decoder;
-import feign.codec.Encoder;
-import feign.codec.ErrorDecoder;
-import feign.form.spring.SpringFormEncoder;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +24,20 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.format.FormatterRegistry;
 
+import com.uoquo.cloud.feign.FeignDecoder;
+import com.uoquo.cloud.feign.FeignEncoder;
+import com.uoquo.cloud.feign.FeignErrorDecoder;
+import com.uoquo.cloud.feign.FeignHeaderInterceptor;
+import com.uoquo.cloud.feign.converter.MapFormHttpMessageConverter;
+import com.uoquo.cloud.feign.processor.DateFormatter;
+
+import feign.Contract;
+import feign.Logger;
+import feign.RequestInterceptor;
+import feign.codec.Decoder;
+import feign.codec.Encoder;
+import feign.codec.ErrorDecoder;
+import feign.form.spring.SpringFormEncoder;
 import jakarta.annotation.Nullable;
 
 /**
@@ -153,7 +151,7 @@ public class FeignConfiguration implements FeignFormatterRegistrar {
         // 自定义processor
         // feign自身的param注解，不重写，防止与原有的冲突
         // annotatedArgumentResolvers.add(new FeignParamProcessor());
-        annotatedArgumentResolvers.add(new RequestParamProcessor());
+        //annotatedArgumentResolvers.add(new RequestParamProcessor());
         
         if (feignConversionService == null) {
             feignConversionService = new DefaultConversionService();

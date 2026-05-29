@@ -4,12 +4,12 @@
  */
 package com.uoquo.condition;
 
+import java.util.Map;
+
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.type.AnnotatedTypeMetadata;
-
-import java.util.Map;
 
 /**
  * 属性是否存在的校验

@@ -5,12 +5,14 @@
 
 package com.uoquo.cloud.feign.processor;
 
-import com.uoquo.utils.DateUtil;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+
 import org.springframework.format.Formatter;
+
+import com.uoquo.utils.DateUtil;
 
 /**
  * 描述：feign日期参数格式化. <br>
@@ -37,7 +39,7 @@ public class DateFormatter implements Formatter<Date> {
         if (date == null) {
             return "";
         }
-        SimpleDateFormat sdf = new SimpleDateFormat(DateUtil.FORMAT_TIMESTAMP);
+        SimpleDateFormat sdf = new SimpleDateFormat(DateUtil.FORMAT_TIMESTAMP_LONG);
         return sdf.format(date);
     }
 }

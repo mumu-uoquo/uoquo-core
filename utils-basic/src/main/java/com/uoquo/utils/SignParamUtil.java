@@ -4,14 +4,15 @@
  */
 package com.uoquo.utils;
 
-import com.uoquo.utils.crypto.MD5;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.util.Map;
 import java.util.TreeMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.uoquo.utils.crypto.MD5;
 
 /**
  * 描述：数据签名工具. <br>
