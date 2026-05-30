@@ -59,9 +59,9 @@ import jakarta.annotation.PostConstruct;
 //        "com.uoquo.**.config",     // 配置相关（@Configuration）
         "com.uoquo.**.controller",  // controller相关（@Controller、@RestController）
         "com.uoquo.**.service",     // service相关（@Service、@Repository）
-        "com.uoquo.**.task",        // 任务相关（@Component）
         "com.uoquo.**.interceptor", // 拦截器
         "com.uoquo.**.listener",    // 监听器（@Component）
+        "com.uoquo.**.task",        // 任务相关（@Component）
         "com.uoquo.**.plugin",      // 插件
         "com.uoquo.**.spring",      // 其他需扫描的（如异常处理、工具类等）（@Component）
 })

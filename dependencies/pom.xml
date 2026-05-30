@@ -866,6 +866,7 @@
         </configuration>
       </plugin>
       <!-- 打包git标识 -->
+      <!-- https://mvnrepository.com/artifact/io.github.git-commit-id/git-commit-id-maven-plugin -->
       <!-- https://github.com/git-commit-id/git-commit-id-maven-plugin/blob/master/docs/using-the-plugin.md -->
       <plugin>
         <groupId>io.github.git-commit-id</groupId>
@@ -890,6 +891,7 @@
           <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
           <!-- 无".git"文件夹时,构建是否失败（true） -->
           <failOnNoGitDirectory>false</failOnNoGitDirectory>
+          <failOnUnableToExtractRepoInfo>false</failOnUnableToExtractRepoInfo>
           <!-- 生成"git.properties"文件（false） -->
           <generateGitPropertiesFile>true</generateGitPropertiesFile>
           <!-- 指定"git.properties"文件的存放路径(相对于${project.basedir}的一个路径，默认为根) -->
