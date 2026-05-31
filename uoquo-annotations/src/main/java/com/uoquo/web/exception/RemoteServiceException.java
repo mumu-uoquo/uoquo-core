@@ -23,6 +23,14 @@ public class RemoteServiceException extends AbstractBaseException {
 		super(SystemReturnCode.SYSTEM_ERROR);
 	}
 
+    public RemoteServiceException(String message) {
+        super(SystemReturnCode.SYSTEM_ERROR, message);
+    }
+
+    public RemoteServiceException(String message, Throwable ex) {
+        super(SystemReturnCode.SYSTEM_ERROR, message, ex);
+    }
+
 	@Override
 	public String getTrace() {
 		return this.trace;
