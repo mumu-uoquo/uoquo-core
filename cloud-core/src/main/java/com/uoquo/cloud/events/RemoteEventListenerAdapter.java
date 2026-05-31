@@ -7,6 +7,7 @@ package com.uoquo.cloud.events;
 import com.uoquo.utils.IDGenerator;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.json.JsonUtil;
+import com.uoquo.web.events.AppEvent;
 import com.uoquo.web.events.UoquoEvent;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ public class RemoteEventListenerAdapter extends ApplicationListenerMethodAdapter
             return null;
         }
         ResolvableType parameterType = ResolvableType.forMethodParameter(method, 0);
-        if (parameterType.getRawClass() == RemoteEvent.class) {
+        if ((parameterType.getRawClass() == RemoteEvent.class) || (parameterType.getRawClass() == AppEvent.class)) {
             ResolvableType genericType = parameterType.getGeneric(0);
             Class<?> resolved = genericType.resolve();
             if (resolved != null && resolved != Object.class) {
@@ -77,14 +78,21 @@ public class RemoteEventListenerAdapter extends ApplicationListenerMethodAdapter
                 log.debug("received event: {} serialize event error. {}", event, e2.getMessage());
             }
         }
-        if (declaredDataType != null && event instanceof RemoteEvent<?> remoteEvent) {
+        if (declaredDataType != null ) {
+            String eventDataType = null;
+            if ((event instanceof RemoteEvent<?> remoteEvent)) {
+                eventDataType = remoteEvent.getDataType();
+            }
+            if ((event instanceof AppEvent<?> appEvent)) {
+                eventDataType = appEvent.getDataType();
+            }
             Method method = getTargetMethod();
-            String eventDataType = remoteEvent.getDataType();
             if (eventDataType != null && !declaredDataType.equals(simpleName(eventDataType))) {
                 log.debug("skip remote event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
                 return;
+            } else {
+                log.debug("process remote event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
             }
-            log.debug("process remote event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
         }
         super.onApplicationEvent(event);
     }

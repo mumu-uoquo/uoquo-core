@@ -5,9 +5,12 @@
 package com.uoquo.web.events;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.uoquo.utils.StringUtil;
+import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEvent;
 
-import jakarta.validation.constraints.NotNull;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,7 +20,7 @@ import java.util.Map;
  * @author xuhz
  */
 @JsonIgnoreProperties("source")
-public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent {
+public class AppEvent<T> extends ApplicationEvent implements UoquoEvent {
     private static final Object TRANSIENT_SOURCE = new Object();
 
     /**
@@ -26,7 +29,7 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
     protected String id;
 
     /**
-     * 重发标识（标识当前事件信息是否重发的）
+     * 重发标识（标识当前事件信息是否是重发的）
      */
     protected boolean retry;
 
@@ -136,6 +139,11 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
     protected String remarks;
 
     /**
+     * 业务数据类型（即泛型T的全限定名）
+     */
+    private String dataType;
+
+    /**
      * 旧数据
      */
     protected T oldData;
@@ -150,6 +158,12 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
      */
     protected AppEvent() {
         super(TRANSIENT_SOURCE);
+        // 子类可以通过反射获取泛型类型
+        Type superClass = getClass().getGenericSuperclass();
+        if (superClass instanceof ParameterizedType) {
+            Type type = ((ParameterizedType) superClass).getActualTypeArguments()[0];
+            this.dataType = type.getTypeName();
+        }
     }
 
     /**
@@ -158,7 +172,7 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
      * @param operationType   操作类型
      * @param operationStatus 操作状态
      */
-    public AppEvent(@NotNull String businessType, String operationType, String operationStatus) {
+    public AppEvent(@NonNull String businessType, @NonNull String operationType, String operationStatus) {
         // 默认以业务类型为事件主题
         this(businessType, operationType, operationStatus, null);
     }
@@ -170,13 +184,19 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
      * @param operationStatus 操作状态
      * @param destinationService 定向模块名（可为空）
      */
-    public AppEvent(@NotNull String businessType, String operationType, String operationStatus, String destinationService) {
+    public AppEvent(@NonNull String businessType, @NonNull String operationType, String operationStatus, String destinationService) {
         super(TRANSIENT_SOURCE);
         // 其他属性
         this.businessType    = businessType;
         this.operationType   = operationType;
         this.operationStatus = operationStatus;
         this.destination     = destinationService;
+        // 子类可以通过反射获取泛型类型
+        Type superClass = getClass().getGenericSuperclass();
+        if (superClass instanceof ParameterizedType) {
+            Type type = ((ParameterizedType) superClass).getActualTypeArguments()[0];
+            this.dataType = type.getTypeName();
+        }
     }
 
     @Override
@@ -235,7 +255,7 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
     }
 
     @Override
-    public void setBusinessType(@NotNull String businessType) {
+    public void setBusinessType(@NonNull String businessType) {
         this.businessType = businessType;
     }
 
@@ -315,7 +335,7 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
     }
 
     @Override
-    public void setOperationType(@NotNull String operationType) {
+    public void setOperationType(@NonNull String operationType) {
         this.operationType = operationType;
     }
 
@@ -419,6 +439,25 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
         this.remarks = remarks;
     }
 
+    public String getDataType() {
+        if (this.dataType != null) {
+            return this.dataType;
+        } else if (this.oldData != null) {
+            return this.oldData.getClass().getTypeName();
+        } else if (this.newData != null) {
+            return this.newData.getClass().getTypeName();
+        }
+        return null;
+    }
+
+    public void setDataType(@NonNull Class<T> clazz) {
+        this.dataType = clazz.getTypeName();
+    }
+
+    public void setDataType(String dataType) {
+        this.dataType = dataType;
+    }
+
     public T getOldData() {
         return oldData;
     }
@@ -433,5 +472,40 @@ public abstract class AppEvent<T> extends ApplicationEvent implements UoquoEvent
 
     public void setNewData(T newData) {
         this.newData = newData;
+    }
+
+    /**
+     * 复制事件的基本信息
+     * @param sourceEvent 源事件
+     */
+    public void copy(UoquoEvent sourceEvent) {
+        if (StringUtil.isNull(this.getId())) {
+            this.setId(sourceEvent.getId());
+        }
+        if (StringUtil.isNull(this.getToken())) {
+            this.setToken(sourceEvent.getToken());
+        }
+        if (StringUtil.isNull(this.getTraceId())) {
+            this.setTraceId(sourceEvent.getTraceId());
+        }
+        if (StringUtil.isNull(this.getAppKey())) {
+            this.setAppKey(sourceEvent.getAppKey());
+            this.setAppDeviceId(sourceEvent.getAppDeviceId());
+            this.setAppVersion(sourceEvent.getAppVersion());
+            this.setAppIp(sourceEvent.getAppIp());
+        }
+        if (StringUtil.isNull(this.getOperatorId())) {
+            this.setOperatorId(sourceEvent.getOperatorId());
+            this.setOperatorName(sourceEvent.getOperatorName());
+            this.setOperationTime(sourceEvent.getOperationTime());
+        }
+        if (StringUtil.isNull(this.getOperatorInstituteId())) {
+            this.setOperatorInstituteId(sourceEvent.getOperatorInstituteId());
+        }
+        if (StringUtil.isNull(this.getBusinessId())) {
+            this.setBusinessId(sourceEvent.getBusinessId());
+            this.setBusinessInstituteId(sourceEvent.getBusinessInstituteId());
+            this.setBusinessTable(sourceEvent.getBusinessTable());
+        }
     }
 }

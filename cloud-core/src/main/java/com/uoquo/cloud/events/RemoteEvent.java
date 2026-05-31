@@ -7,9 +7,9 @@ package com.uoquo.cloud.events;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.web.events.UoquoEvent;
+import org.jspecify.annotations.NonNull;
 import org.springframework.cloud.bus.event.RemoteApplicationEvent;
 
-import jakarta.validation.constraints.NotNull;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Date;
@@ -175,7 +175,7 @@ public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent
      * @param operationType   操作类型
      * @param operationStatus 操作状态
      */
-    public RemoteEvent(@NotNull String businessType, @NotNull String operationType, String operationStatus) {
+    public RemoteEvent(@NonNull String businessType, @NonNull String operationType, String operationStatus) {
         // 默认以业务类型为事件主题
         this(businessType, operationType, operationStatus, null);
     }
@@ -187,7 +187,7 @@ public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent
      * @param operationStatus 操作状态
      * @param destinationService 定向服务名（可为空）
      */
-    public RemoteEvent(@NotNull String businessType, @NotNull String operationType, String operationStatus, String destinationService) {
+    public RemoteEvent(@NonNull String businessType, @NonNull String operationType, String operationStatus, String destinationService) {
         super(TRANSIENT_SOURCE, ORIGIN_FACTORY.getOrigin(null), DEFAULT_DESTINATION_FACTORY.getDestination(StringUtil.isNull(destinationService) ? null : destinationService));
         // 其他属性
         this.businessType    = businessType;
@@ -258,7 +258,7 @@ public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent
     }
 
     @Override
-    public void setBusinessType(@NotNull String businessType) {
+    public void setBusinessType(@NonNull String businessType) {
         this.businessType = businessType;
     }
 
@@ -338,7 +338,7 @@ public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent
     }
 
     @Override
-    public void setOperationType(@NotNull String operationType) {
+    public void setOperationType(@NonNull String operationType) {
         this.operationType = operationType;
     }
 
@@ -453,7 +453,7 @@ public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent
         return null;
     }
 
-    public void setDataType(@NotNull Class<T> clazz) {
+    public void setDataType(@NonNull Class<T> clazz) {
         this.dataType = clazz.getTypeName();
     }
 

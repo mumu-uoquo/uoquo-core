@@ -14,6 +14,7 @@ import org.slf4j.MDC;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.event.ApplicationListenerMethodAdapter;
 import org.jspecify.annotations.NonNull;
+import org.springframework.core.ResolvableType;
 
 import java.lang.reflect.Method;
 
@@ -23,8 +24,42 @@ import java.lang.reflect.Method;
 public class AppEventListenerAdapter extends ApplicationListenerMethodAdapter {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    /**
+     * 监听方法声明的 AppEvent 泛型类型 SimpleName（跨服务包名可能不同，用 SimpleName 兼容）。
+     * 如 method(AppEvent<SseMessage> event) → "SseMessage"
+     * 如 method(AppEvent<?> event) → null（匹配所有 AppEvent）
+     * 如 method(CustomEvent event) → null（子类由 Spring 类型检查处理）
+     */
+    private final String declaredDataType;
+
     public AppEventListenerAdapter(String beanName, Class<?> targetClass, Method method) {
         super(beanName, targetClass, method);
+        this.declaredDataType = resolveDataType(method);
+    }
+
+    /**
+     * 解析监听方法第一个参数中 AppEvent 的泛型类型。
+     * 仅当参数类型恰好是 AppEvent（非子类）且泛型为具体类型（非 ?）时返回 SimpleName。
+     */
+    private String resolveDataType(Method method) {
+        if (method.getParameterCount() == 0) {
+            return null;
+        }
+        ResolvableType parameterType = ResolvableType.forMethodParameter(method, 0);
+        if (parameterType.getRawClass() == AppEvent.class) {
+            ResolvableType genericType = parameterType.getGeneric(0);
+            Class<?> resolved = genericType.resolve();
+            if (resolved != null && resolved != Object.class) {
+                log.debug("the EventListener [{}], and the dataType is '{}'", method, resolved.getSimpleName());
+                return resolved.getSimpleName();
+            }
+        }
+        return null;
+    }
+
+    private static String simpleName(String typeName) {
+        int dot = typeName.lastIndexOf('.');
+        return dot >= 0 ? typeName.substring(dot + 1) : typeName;
     }
 
     /**
@@ -39,6 +74,15 @@ public class AppEventListenerAdapter extends ApplicationListenerMethodAdapter {
             } catch (Throwable e2) {
                 log.debug("received event: {} serialize event error. {}", event, e2.getMessage());
             }
+        }
+        if (declaredDataType != null && event instanceof AppEvent<?> appEvent) {
+            Method method = getTargetMethod();
+            String eventDataType = appEvent.getDataType();
+            if (eventDataType != null && !declaredDataType.equals(simpleName(eventDataType))) {
+                log.debug("skip remote event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
+                return;
+            }
+            log.debug("process remote event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
         }
         super.onApplicationEvent(event);
     }
