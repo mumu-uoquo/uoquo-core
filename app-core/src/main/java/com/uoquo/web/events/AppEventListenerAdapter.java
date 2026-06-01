@@ -92,7 +92,7 @@ public class AppEventListenerAdapter extends ApplicationListenerMethodAdapter {
         Method method = getTargetMethod();
         Object event = (args != null) && args.length > 0 ? args[0] : null;
         if (event == null) {
-            log.error("process event error. method: {}; data: {} .", method, "event is null");
+            log.warn("process event error. method: {}; data: {} .", method, "event is null");
             return null;
         }
         String traceId = (event instanceof UoquoEvent) ? ((UoquoEvent) event).getTraceId() : IDGenerator.getNextULID();
