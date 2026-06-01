@@ -16,34 +16,45 @@ import java.util.List;
 
 public class RedisConfigProperties extends RedisProperties {
 
-    protected static final Logger log = LoggerFactory.getLogger(RedisConfigProperties.class);
+    protected final Logger log = LoggerFactory.getLogger(this.getClass());
 
     @Override
     public Sentinel getSentinel() {
         Sentinel sentinel = super.getSentinel();
-        if (sentinel != null) {
-            List<String> nodes = checkNodes(sentinel.getNodes());
-            if (nodes.isEmpty()) {
-                super.setSentinel(null);
-            } else {
-                sentinel.setNodes(nodes);
-            }
+        if (sentinel == null) {
+            return null;
         }
-        return super.getSentinel();
+        // 有配置时需要解析
+        List<String> nodes = checkNodes(sentinel.getNodes());
+        if (nodes.isEmpty()) {
+            return null;
+        } else {
+            log.debug("redis sentinel property '{}'", nodes);
+            sentinel.setNodes(nodes);
+            return sentinel;
+        }
     }
 
     @Override
     public Cluster getCluster() {
-        Cluster cluster = super.getCluster();
-        if (cluster != null) {
-            List<String> nodes = checkNodes(cluster.getNodes());
-            if (nodes.isEmpty()) {
-                super.setCluster(null);
-            } else {
-                cluster.setNodes(nodes);
-            }
+        // 有哨兵的配置时，优先用哨兵配置
+        if (this.getSentinel() != null) {
+            return null;
         }
-        return super.getCluster();
+        // 解析集群配置
+        Cluster cluster = super.getCluster();
+        if (cluster == null) {
+            return null;
+        }
+        // 有配置时需要解析
+        List<String> nodes = checkNodes(cluster.getNodes());
+        if (nodes.isEmpty()) {
+            return null;
+        } else {
+            log.debug("redis cluster property '{}'", nodes);
+            cluster.setNodes(nodes);
+            return cluster;
+        }
     }
 
     private List<String> checkNodes(List<String> nodes) {
