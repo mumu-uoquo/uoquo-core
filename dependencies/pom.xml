@@ -26,7 +26,7 @@
     <java.version>21</java.version>
     <maven.compiler.source>${java.version}</maven.compiler.source>
     <maven.compiler.target>${java.version}</maven.compiler.target>
-    <maven.compiler.compilerVersion>${java.version}</maven.compiler.compilerVersion>
+    <maven.compiler.release>${java.version}</maven.compiler.release>
     <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
     <maven.test.skip>true</maven.test.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -922,6 +922,7 @@
         <configuration>
           <source>${java.version}</source>
           <target>${java.version}</target>
+          <release>${java.version}</release>
           <encoding>${project.build.sourceEncoding}</encoding>
           <!-- 必须开启这个，SpEL才能按参数名绑定 -->
           <parameters>true</parameters>

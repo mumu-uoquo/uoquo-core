@@ -29,6 +29,11 @@ public class RedisConfigProperties extends RedisProperties {
         if (nodes.isEmpty()) {
             return null;
         } else {
+            // 因为 PropertiesRedisConnectionDetails.getSentinel() 调用了 getStandalone().getDatabase() 导致要检测host的配置
+            // 所以此处需要设置host，否则会报错，无实际用处，仅用于检测
+            if (StringUtil.isNull(this.getHost())) {
+                this.setHost("localhost");
+            }
             log.debug("redis sentinel property '{}'", nodes);
             sentinel.setNodes(nodes);
             return sentinel;
