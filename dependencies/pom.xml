@@ -1081,7 +1081,7 @@
             <!-- 会自动加载标注了 @SpringBootApplication 的启动类 -->
             <!-- <mainClass>${start-class}</mainClass> -->
             <!-- 2.1.4 之后不包含该属性 -->
-            <finalName>${project.artifactId}</finalName>
+            <!-- <finalName>${project.artifactId}</finalName> -->
             <!-- 3.x 之后默认可执行，不再需要该属性，已被移除 -->
             <!-- <executable>true</executable> -->
             <excludeDevtools>false</excludeDevtools>
