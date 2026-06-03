@@ -5,16 +5,13 @@
 package com.uoquo.cloud.test;
 
 import com.uoquo.cloud.events.RemoteEventListenerAdapter;
-import com.uoquo.cloud.events.deserializer.DataTypeResolver;
-import com.uoquo.cloud.events.deserializer.RemoteEventDeserializer;
-import com.uoquo.cloud.events.deserializer.RemoteEventPackageScanner;
+import com.uoquo.web.events.deserializer.DataTypeResolver;
+import com.uoquo.web.events.deserializer.EventPackageScanner;
 import org.junit.jupiter.api.Test;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.channel.PublishSubscribeChannel;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.MessagingException;
-import org.springframework.messaging.support.ErrorMessage;
 import org.springframework.test.util.AssertionErrors;
 
 import java.lang.reflect.Method;
@@ -110,7 +107,7 @@ public class PreservationPropertyTest {
      */
     @Test
     public void observation1_dataTypeResolver_knownDataType_resolvesCorrectly() {
-        RemoteEventPackageScanner scanner = new RemoteEventPackageScanner(
+        EventPackageScanner scanner = new EventPackageScanner(
                 new String[]{"com.uoquo.cloud.events", "com.uoquo.cloud.test"});
         DataTypeResolver resolver = new DataTypeResolver(scanner);
 
@@ -234,7 +231,7 @@ public class PreservationPropertyTest {
      */
     @Test
     public void observation4_dataTypeResolver_nullDataType_fallsBackToMapClass() {
-        RemoteEventPackageScanner scanner = new RemoteEventPackageScanner(
+        EventPackageScanner scanner = new EventPackageScanner(
                 new String[]{"com.uoquo.cloud.events"});
         DataTypeResolver resolver = new DataTypeResolver(scanner);
 
@@ -254,7 +251,7 @@ public class PreservationPropertyTest {
      */
     @Test
     public void observation4_dataTypeResolver_unknownDataType_fallsBackToMapClass() {
-        RemoteEventPackageScanner scanner = new RemoteEventPackageScanner(
+        EventPackageScanner scanner = new EventPackageScanner(
                 new String[]{"com.uoquo.cloud.events"});
         DataTypeResolver resolver = new DataTypeResolver(scanner);
 
@@ -270,7 +267,7 @@ public class PreservationPropertyTest {
      */
     @Test
     public void observation4_dataTypeResolver_emptyDataType_fallsBackToMapClass() {
-        RemoteEventPackageScanner scanner = new RemoteEventPackageScanner(
+        EventPackageScanner scanner = new EventPackageScanner(
                 new String[]{"com.uoquo.cloud.events"});
         DataTypeResolver resolver = new DataTypeResolver(scanner);
 

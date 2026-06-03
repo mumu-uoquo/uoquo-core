@@ -2,7 +2,7 @@
  * Copyright (c) 2025, www.uoquo.com All Rights Reserved.
  * 注意：本内容仅限于内部传阅，禁止外泄
  */
-package com.uoquo.cloud.events.deserializer;
+package com.uoquo.web.events.deserializer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +19,7 @@ import java.util.Optional;
  *   <li>null / 空白 → {@code Map.class}（无日志）</li>
  *   <li>含 "." → 先尝试 ClassLoader 全限定名加载；失败后取简单类名走第二级</li>
  *   <li>不含 "." → 直接走第二级</li>
- *   <li>第二级：先查 {@link BuiltinTypeRegistry}；未命中则调用 {@link RemoteEventPackageScanner}</li>
+ *   <li>第二级：先查 {@link BuiltinTypeRegistry}；未命中则调用 {@link EventPackageScanner}</li>
  *   <li>唯一匹配 → WARN 日志 + 返回该 Class</li>
  *   <li>多个匹配 → WARN 日志（含歧义列表）+ {@code Map.class}</li>
  *   <li>无匹配 → WARN 日志（含 dataType 和 eventType 值）+ {@code Map.class}</li>
@@ -29,9 +29,9 @@ public class DataTypeResolver {
 
     private static final Logger log = LoggerFactory.getLogger(DataTypeResolver.class);
 
-    private final RemoteEventPackageScanner scanner;
+    private final EventPackageScanner scanner;
 
-    public DataTypeResolver(RemoteEventPackageScanner scanner) {
+    public DataTypeResolver(EventPackageScanner scanner) {
         this.scanner = scanner;
     }
 

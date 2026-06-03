@@ -4,6 +4,7 @@
  */
 package com.uoquo.web;
 
+import com.uoquo.web.events.deserializer.ApplicationEventScan;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -71,6 +72,7 @@ import jakarta.annotation.PostConstruct;
         "com.uoquo.**.servlet",  // servlet（@WebServlet）
 })
 @EnableTransactionManagement    // 开启事物
+@ApplicationEventScan({"com.uoquo.**.event", "com.uoquo.**.events", "com.uoquo.**.model"})
 public class ServiceAutoConfiguration {
 
     private final Logger log = LoggerFactory.getLogger(getClass());

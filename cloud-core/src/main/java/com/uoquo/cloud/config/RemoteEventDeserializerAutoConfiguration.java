@@ -8,9 +8,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.uoquo.cloud.events.BusErrorChannelHandler;
 import com.uoquo.cloud.events.RemoteEvent;
-import com.uoquo.cloud.events.deserializer.DataTypeResolver;
 import com.uoquo.cloud.events.deserializer.RemoteEventDeserializer;
-import com.uoquo.cloud.events.deserializer.RemoteEventPackageScanner;
+import com.uoquo.web.events.deserializer.DataTypeResolver;
+import com.uoquo.web.events.deserializer.EventPackageScanner;
 import com.uoquo.cloud.kafka.DeserializationFailureData;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -19,7 +19,9 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.SearchStrategy;
 import org.springframework.cloud.bus.jackson.BusJacksonAutoConfiguration;
 import org.springframework.cloud.bus.jackson.RemoteApplicationEventScan;
 import org.springframework.context.ApplicationContext;
@@ -61,22 +63,18 @@ public class RemoteEventDeserializerAutoConfiguration {
     private static final Logger log = LoggerFactory.getLogger(RemoteEventDeserializerAutoConfiguration.class);
 
     @Bean
-    public RemoteEventPackageScanner remoteEventPackageScanner(ApplicationContext ctx) {
+    @ConditionalOnMissingBean(value = EventPackageScanner.class, search = SearchStrategy.CURRENT)
+    public EventPackageScanner eventPackageScanner(ApplicationContext ctx) {
+        log.info("Scanning annotations for RemoteApplicationEventScan");
         Map<String, Object> beans = ctx.getBeansWithAnnotation(RemoteApplicationEventScan.class);
         List<String> packages = new ArrayList<>();
         for (Object bean : beans.values()) {
-            RemoteApplicationEventScan annotation =
-                    AnnotationUtils.findAnnotation(bean.getClass(), RemoteApplicationEventScan.class);
+            RemoteApplicationEventScan annotation = AnnotationUtils.findAnnotation(bean.getClass(), RemoteApplicationEventScan.class);
             if (annotation != null) {
                 packages.addAll(Arrays.asList(annotation.value()));
             }
         }
-        return new RemoteEventPackageScanner(packages.toArray(new String[0]));
-    }
-
-    @Bean
-    public DataTypeResolver dataTypeResolver(RemoteEventPackageScanner scanner) {
-        return new DataTypeResolver(scanner);
+        return new EventPackageScanner(packages.toArray(new String[0]));
     }
 
     @Bean

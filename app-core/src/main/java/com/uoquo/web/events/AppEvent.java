@@ -5,6 +5,7 @@
 package com.uoquo.web.events;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.uoquo.utils.StringUtil;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEvent;
@@ -19,6 +20,7 @@ import java.util.Map;
  * 子类必须实现无参构造函数，否则事件处理器会报错
  * @author xuhz
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonIgnoreProperties("source")
 public class AppEvent<T> extends ApplicationEvent implements UoquoEvent {
     private static final Object TRANSIENT_SOURCE = new Object();

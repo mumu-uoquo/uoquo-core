@@ -79,10 +79,10 @@ public class AppEventListenerAdapter extends ApplicationListenerMethodAdapter {
             Method method = getTargetMethod();
             String eventDataType = appEvent.getDataType();
             if (eventDataType != null && !declaredDataType.equals(simpleName(eventDataType))) {
-                log.debug("skip remote event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
+                log.debug("skip event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
                 return;
             }
-            log.debug("process remote event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
+            log.debug("process event. method: {}; method declared: {}, event actual: {}", method, declaredDataType, eventDataType);
         }
         super.onApplicationEvent(event);
     }

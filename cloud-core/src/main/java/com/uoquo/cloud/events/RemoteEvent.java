@@ -5,6 +5,7 @@
 package com.uoquo.cloud.events;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.web.events.UoquoEvent;
 import org.jspecify.annotations.NonNull;
@@ -20,6 +21,7 @@ import java.util.Map;
  * 子类必须实现无参构造函数，否则事件处理器会报错
  * @author xuhz
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonIgnoreProperties("source")
 public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent {
     protected static final Object TRANSIENT_SOURCE = new Object();

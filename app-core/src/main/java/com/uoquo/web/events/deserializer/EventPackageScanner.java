@@ -2,7 +2,7 @@
  * Copyright (c) 2025, www.uoquo.com All Rights Reserved.
  * 注意：本内容仅限于内部传阅，禁止外泄
  */
-package com.uoquo.cloud.events.deserializer;
+package com.uoquo.web.events.deserializer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,28 +13,24 @@ import org.springframework.core.type.classreading.SimpleMetadataReaderFactory;
 import org.springframework.util.ClassUtils;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 在 {@code @RemoteApplicationEventScan} 声明的包路径下扫描所有类，
+ * 在 {@code @RemoteApplicationEventScan} 或 {@code @ApplicationEventScan} 声明的包路径下扫描所有类，
  * 结果按简单类名缓存，支持 Ant 风格通配符包路径。
  */
-public class RemoteEventPackageScanner {
+public class EventPackageScanner {
 
-    private static final Logger log = LoggerFactory.getLogger(RemoteEventPackageScanner.class);
+    private static final Logger log = LoggerFactory.getLogger(EventPackageScanner.class);
 
     private final String[] basePackages;
     private final AtomicReference<Map<String, List<Class<?>>>> indexRef = new AtomicReference<>();
 
     /**
-     * @param basePackages 来自 {@code @RemoteApplicationEventScan} 的包路径数组（支持 Ant 风格通配符）
+     * @param basePackages 来自 {@code @RemoteApplicationEventScan} 或 {@code @ApplicationEventScan}  的包路径数组（支持 Ant 风格通配符）
      */
-    public RemoteEventPackageScanner(String[] basePackages) {
+    public EventPackageScanner(String[] basePackages) {
         this.basePackages = basePackages == null ? new String[0] : basePackages;
     }
 
@@ -87,15 +83,15 @@ public class RemoteEventPackageScanner {
                             index.computeIfAbsent(simpleName, k -> new ArrayList<>()).add(clazz);
                         }
                     } catch (ClassNotFoundException | LinkageError e) {
-                        log.debug("RemoteEventPackageScanner: skipping class that cannot be loaded from resource {}: {}",
+                        log.debug("EventPackageScanner: skipping class that cannot be loaded from resource {}: {}",
                                 resource, e.getMessage());
                     } catch (IOException e) {
-                        log.debug("RemoteEventPackageScanner: skipping unreadable resource {}: {}",
+                        log.debug("EventPackageScanner: skipping unreadable resource {}: {}",
                                 resource, e.getMessage());
                     }
                 }
             } catch (IOException e) {
-                log.warn("RemoteEventPackageScanner: failed to scan package pattern '{}': {}", pattern, e.getMessage());
+                log.warn("EventPackageScanner: failed to scan package pattern '{}': {}", pattern, e.getMessage());
             }
         }
         return index;
@@ -111,5 +107,12 @@ public class RemoteEventPackageScanner {
         // replace dots with slashes (but not wildcard segments like **)
         String slashed = packagePath.replace('.', '/');
         return "classpath*:" + slashed + "/**/*.class";
+    }
+
+    @Override
+    public String toString() {
+        return "EventPackageScanner{" +
+                "basePackages=" + Arrays.toString(basePackages) +
+                '}';
     }
 }

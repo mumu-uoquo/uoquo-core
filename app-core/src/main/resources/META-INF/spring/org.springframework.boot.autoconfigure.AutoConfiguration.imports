@@ -1,4 +1,5 @@
 com.uoquo.web.config.EventConfig
+com.uoquo.web.config.EventDeserializerAutoConfiguration
 com.uoquo.web.config.RedisConfig
 com.uoquo.web.config.MyBatisPluginConfig
 com.uoquo.web.config.TaskSchedulerConfig

@@ -103,6 +103,8 @@ public class KafkaConfig {
                             }
                         }
                         busBridge.send((RemoteApplicationEvent) event);
+                        // 最终执行的是 streamBridge.send 方法
+                        // streamBridge.send(BusConstants.OUTPUT, MessageBuilder.withPayload(event).build());
                     } else {
                         // 发布到本地
                         if (log.isDebugEnabled()) {
