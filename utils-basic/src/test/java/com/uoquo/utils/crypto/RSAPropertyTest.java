@@ -4,13 +4,11 @@
  */
 package com.uoquo.utils.crypto;
 
-import com.uoquo.utils.StringUtil;
 import net.jqwik.api.*;
 import net.jqwik.api.lifecycle.BeforeContainer;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.security.KeyPair;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -45,9 +43,9 @@ class RSAPropertyTest {
 
     @BeforeContainer
     static void setup() throws GeneralSecurityException {
-        KeyPair keyPair = RSA.generateKeyPair();
-        publicKeyHex = StringUtil.byte2hex(keyPair.getPublic().getEncoded());
-        privateKeyHex = StringUtil.byte2hex(keyPair.getPrivate().getEncoded());
+        RSA.KeyPair keyPair = RSA.generateKeyPair();
+        publicKeyHex = keyPair.getPublicKey();
+        privateKeyHex = keyPair.getPrivateKey();
     }
 
     // ===== Providers =====

@@ -3,6 +3,7 @@
  */
 package com.uoquo.test;
 
+import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.crypto.RSA;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -21,16 +22,18 @@ class RSAGenerateKeyPairTest {
     @ParameterizedTest
     @ValueSource(ints = {1024, 2048, 4096})
     void generateKeyPair_validKeySizes_shouldSucceed(int keySize) throws GeneralSecurityException {
-        KeyPair keyPair = RSA.generateKeyPair(keySize);
+        RSA.KeyPair keyPair = RSA.generateKeyPair(keySize);
         assertNotNull(keyPair);
-        assertNotNull(keyPair.getPublic());
-        assertNotNull(keyPair.getPrivate());
+        assertNotNull(keyPair.getPublicKey());
+        assertNotNull(keyPair.getPrivateKey());
         // 验证生成的密钥长度与请求的一致
-        int actualBitLength = keyPair.getPublic().getEncoded().length * 8;
+        byte[] publicKeyBytes = StringUtil.hex2byte(keyPair.getPublicKey());
+        byte[] privateKeyBytes = StringUtil.hex2byte(keyPair.getPrivateKey());
+        int actualBitLength = publicKeyBytes.length * 8;
         // 公钥编码包含额外的 ASN.1 头部信息，所以实际字节数会大于 keySize/8
         // 但私钥的 modulus 位数应该等于 keySize
-        assertTrue(keyPair.getPublic().getEncoded().length > 0);
-        assertTrue(keyPair.getPrivate().getEncoded().length > 0);
+        assertTrue(publicKeyBytes.length > 0);
+        assertTrue(privateKeyBytes.length > 0);
     }
 
     @ParameterizedTest
@@ -45,9 +48,9 @@ class RSAGenerateKeyPairTest {
 
     @Test
     void generateKeyPair_defaultNoArg_shouldGenerate2048() throws GeneralSecurityException {
-        KeyPair keyPair = RSA.generateKeyPair();
+        RSA.KeyPair keyPair = RSA.generateKeyPair();
         assertNotNull(keyPair);
-        assertNotNull(keyPair.getPublic());
-        assertNotNull(keyPair.getPrivate());
+        assertNotNull(keyPair.getPublicKey());
+        assertNotNull(keyPair.getPrivateKey());
     }
 }

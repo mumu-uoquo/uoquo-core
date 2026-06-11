@@ -83,6 +83,40 @@ public class RSA {
     private static final java.util.Set<Integer> SUPPORTED_KEY_SIZES = java.util.Set.of(1024, 2048, 4096);
 
     /**
+     * RSA 密钥对.
+     */
+    public static class KeyPair {
+        private final String publicKey;   // 130 字符 hex（04 + 64字节坐标）
+        private final String privateKey;  // 64 字符 hex（32 字节大整数）
+
+        /**
+         * 构造密钥对.
+         * @param publicKey  公钥（130 字符 hex）
+         * @param privateKey 私钥（64 字符 hex）
+         */
+        public KeyPair(String publicKey, String privateKey) {
+            this.publicKey = publicKey;
+            this.privateKey = privateKey;
+        }
+
+        /**
+         * 获取公钥.
+         * @return 公钥（130 字符 hex，04 前缀 + 64 字节坐标）
+         */
+        public String getPublicKey() {
+            return publicKey;
+        }
+
+        /**
+         * 获取私钥.
+         * @return 私钥（64 字符 hex，32 字节大整数）
+         */
+        public String getPrivateKey() {
+            return privateKey;
+        }
+    }
+
+    /**
      * 生成 RSA 密钥对（默认 2048 位）.
      * <p>使用默认构造的 SecureRandom 实例（不调用 setSeed），确保密钥生成过程符合安全最佳实践。</p>
      *
@@ -110,7 +144,10 @@ public class RSA {
         }
         KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance(ALGORITHM_ENCRYPT);
         keyPairGen.initialize(keySize, new SecureRandom());
-        return keyPairGen.generateKeyPair();
+        // 组装为String
+        String publicKey  = StringUtil.byte2hex(keyPairGen.generateKeyPair().getPublic().getEncoded());
+        String privateKey = StringUtil.byte2hex(keyPairGen.generateKeyPair().getPrivate().getEncoded());
+        return new KeyPair(publicKey, privateKey);
     }
     
     /**
