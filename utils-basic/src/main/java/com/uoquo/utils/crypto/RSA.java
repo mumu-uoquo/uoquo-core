@@ -483,22 +483,15 @@ public class RSA {
     private static byte[] cipherSection(byte[] data, Cipher cipher, int maxSize) throws GeneralSecurityException, IOException {
         int len = data.length; // 剩余长度
         int idx = 0;           // 索引位置
-        try (
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ) {
-            byte[] temp;
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             while (len > 0) {
-                if (len > maxSize) {
-                    temp = cipher.doFinal(data, idx, maxSize);
-                } else {
-                    temp = cipher.doFinal(data, idx, len);
-                }
-                out.write(temp, 0, temp.length);
-                idx += maxSize;
-                len -= maxSize;
+                int blockSize = Math.min(len, maxSize); // 本次实际处理的字节数
+                byte[] temp = cipher.doFinal(data, idx, blockSize);
+                out.write(temp);
+                idx += blockSize;
+                len -= blockSize;
             }
-            temp = out.toByteArray();
-            return temp;
+            return out.toByteArray();
         }
     }
 }
