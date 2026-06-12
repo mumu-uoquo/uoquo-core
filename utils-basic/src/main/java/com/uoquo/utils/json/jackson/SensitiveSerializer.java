@@ -128,7 +128,7 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
             gen.writeNull();
             return;
         }
-        if (annotation == null) {
+        if (value.isEmpty() || annotation == null) {
             gen.writeString(value);
             return;
         }
