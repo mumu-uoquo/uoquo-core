@@ -37,7 +37,6 @@ public class CryptoTest {
         // hex 要测试下性能
         String msg = "123456";
         System.out.println(MD5.encrypt(msg));
-        System.out.println(MD5.encryptMix(msg));
     }
 
     @Test

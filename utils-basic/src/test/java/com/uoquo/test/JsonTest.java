@@ -4,18 +4,9 @@
  */
 package com.uoquo.test;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.uoquo.test.pojo.User1;
 import com.uoquo.test.pojo.User2;
-import com.uoquo.utils.DateUtil;
-import com.uoquo.utils.StringUtil;
-import com.uoquo.utils.json.GsonUtil;
 import com.uoquo.utils.json.JsonUtil;
-import com.uoquo.utils.json.jackson.DateContextualDeserializer;
-import com.uoquo.utils.json.jackson.DateContextualSerializer;
 import com.uoquo.utils.json.jackson.SensitiveSerializer;
 import org.junit.jupiter.api.Test;
 
@@ -132,44 +123,6 @@ public class JsonTest {
         System.out.println("\r\n");
 
         System.out.println("-- end jackson test--");
-    }
-
-    @Test
-    public void testGson() {
-        User1 user1 = new User1();
-        user1.setName("张三");
-        user1.setAge(10);
-        user1.setBirthday(new Date());
-
-        User1 user2 = new User1();
-        user2.setName("张三");
-        user2.setAge(10);
-        user2.setBirthday(new Date());
-        user2.setFriends(Arrays.asList(user1));
-
-        List<User1> list = new ArrayList<>();
-        list.add(user1);
-        list.add(user2);
-
-        //
-        String str1 = GsonUtil.serialize(user1);
-        System.out.println(str1);
-        Object a = GsonUtil.deserialize(str1);
-        Object b = GsonUtil.deserialize(str1, User1.class);
-
-        //
-        String str2 = GsonUtil.serializeWithType(user1);
-        System.out.println(str2);
-        Object a2 = GsonUtil.deserialize(str2);
-        Object b2 = GsonUtil.deserialize(str2, User1.class);
-
-        //
-        String str3 = GsonUtil.serialize(list);
-        System.out.println(str3);
-        List<User1> l2 = GsonUtil.deserializeAsList(str3, User1.class);
-        List<User1> l3 = GsonUtil.deserialize(str3, List.class, User1.class);
-
-        System.out.println("----");
     }
 
     @Test

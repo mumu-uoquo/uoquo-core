@@ -6,7 +6,7 @@ package com.uoquo.test;
 
 import com.uoquo.utils.CompressUtil;
 import com.uoquo.utils.StringUtil;
-import com.uoquo.utils.ecg.DataUtil;
+import com.uoquo.utils.DataUtil;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;

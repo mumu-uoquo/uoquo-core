@@ -8,7 +8,7 @@ import com.uoquo.utils.DateUtil;
 import com.uoquo.utils.IDGenerator;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.crypto.*;
-import com.uoquo.utils.ecg.DataUtil;
+import com.uoquo.utils.DataUtil;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
