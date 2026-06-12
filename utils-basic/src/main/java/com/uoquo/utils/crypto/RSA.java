@@ -144,9 +144,10 @@ public class RSA {
         }
         KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance(ALGORITHM_ENCRYPT);
         keyPairGen.initialize(keySize, new SecureRandom());
-        // 组装为String
-        String publicKey  = StringUtil.byte2hex(keyPairGen.generateKeyPair().getPublic().getEncoded());
-        String privateKey = StringUtil.byte2hex(keyPairGen.generateKeyPair().getPrivate().getEncoded());
+        // 组装为String（注：keyPairGen.generateKeyPair() 每次调用都产生新的密钥对）
+        java.security.KeyPair kp = keyPairGen.generateKeyPair();
+        String publicKey  = StringUtil.byte2hex(kp.getPublic().getEncoded());
+        String privateKey = StringUtil.byte2hex(kp.getPrivate().getEncoded());
         return new KeyPair(publicKey, privateKey);
     }
     
