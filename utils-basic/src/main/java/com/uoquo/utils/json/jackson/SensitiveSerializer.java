@@ -26,7 +26,7 @@ import java.io.IOException;
  * 自定义脱敏 / 加密序列化器，与 {@link SensitiveDeserializer} 配对使用。
  *
  * <p>对标注 {@link Sensitive} 注解的 String 字段，在序列化时根据
- * {@link com.uoquo.utils.json.SensitiveType} 执行脱敏（不可逆）或加密（可逆）。</p>
+ * {@link  com.uoquo.annotation.json.SensitiveType} 执行脱敏（不可逆）或加密（可逆）。</p>
  *
  * <h3>处理策略</h3>
  * <ul>
@@ -292,8 +292,8 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
         try {
             return RSA.encryptByPrivateKey(value, priKey);
         } catch (Exception e) {
-            log.warn("RSA 加密失败：{}", e.getMessage());
-            return value;
+            log.warn("RSA 加密失败，降级为TAES加密：{}", e.getMessage());
+            return tryEncryptTimeStep(value, false);
         }
     }
 

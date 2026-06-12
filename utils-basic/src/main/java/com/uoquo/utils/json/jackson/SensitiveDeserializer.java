@@ -173,8 +173,8 @@ public class SensitiveDeserializer extends JsonDeserializer<String> implements C
                 try {
                     return RSA.decrypt(value, priKey);
                 } catch (Exception e) {
-                    log.warn("RSA 解密失败：{}", e.getMessage());
-                    return value;
+                    log.warn("RSA 解密失败，降级为TAES解密：{}", e.getMessage());
+                    return tryTimeStepDecrypt(value, false);
                 }
             }
 
@@ -187,8 +187,8 @@ public class SensitiveDeserializer extends JsonDeserializer<String> implements C
                 try {
                     return SM2.decrypt(value, priKey);
                 } catch (Exception e) {
-                    log.warn("SM2 解密失败：{}", e.getMessage());
-                    return value;
+                    log.warn("SM2 解密失败，降级为TAES解密：{}", e.getMessage());
+                    return tryTimeStepDecrypt(value, false);
                 }
             }
 
