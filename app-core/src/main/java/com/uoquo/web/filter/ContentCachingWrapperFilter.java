@@ -4,22 +4,22 @@
  */
 package com.uoquo.web.filter;
 
-import com.uoquo.utils.StringUtil;
+import java.io.IOException;
+import java.util.Objects;
+
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.jspecify.annotations.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingResponseWrapper;
+
+import com.uoquo.web.utils.WebUtil;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.Objects;
 
 /**
  * 缓存请求体和响应体过滤器
@@ -48,7 +48,7 @@ public class ContentCachingWrapperFilter extends OncePerRequestFilter implements
             throws ServletException, IOException {
         log.debug("----------------------->ContentCachingWrapperFilter do.");
         // 若是SSE请求，则不缓存
-        if (isSseRequest(request)) {
+        if (WebUtil.isSseRequest(request)) {
             log.debug("当前为SSE请求，不缓存请求流和响应流：{}", request.getRequestURI());
             chain.doFilter(request, response);
             return;
@@ -84,20 +84,4 @@ public class ContentCachingWrapperFilter extends OncePerRequestFilter implements
         Objects.requireNonNull(responseWrapper).copyBodyToResponse();
     }
 
-    /**
-     * 判断是否是SSE请求
-     */
-    private boolean isSseRequest(HttpServletRequest request) {
-        // getServletPath 不含上下文
-        // getRequestURI  包含上下文
-        String path = request.getServletPath();
-        if (!path.contains("/sse/")) {
-            return false;
-        }
-        String contentType = request.getContentType();
-        if (StringUtil.isNull(contentType)) {
-            contentType = request.getHeader(HttpHeaders.ACCEPT);
-        }
-        return contentType != null && contentType.contains(MediaType.TEXT_EVENT_STREAM_VALUE);
-    }
 }

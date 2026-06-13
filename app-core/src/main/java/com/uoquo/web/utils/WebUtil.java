@@ -13,6 +13,7 @@ import com.uoquo.utils.json.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -106,7 +107,10 @@ public class WebUtil {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         String contentType = request.getHeader("Content-Type");
         contentType = (contentType == null) ? "" : contentType.toLowerCase();
-        if (!contentType.startsWith("multipart/form-data") && !contentType.startsWith("application/octet-stream")) {
+        // SSE请求不处理请求体签名（SSE为长连接流式响应，不含请求体）
+        if (!isSseRequest(request)
+                && !contentType.startsWith("multipart/form-data")
+                && !contentType.startsWith("application/octet-stream")) {
             try (
                     ServletInputStream in = request.getInputStream();
             ) {
@@ -121,6 +125,17 @@ public class WebUtil {
         }
 
         return SignParamUtil.sign(appid, secret, token, language, nonce, deviceId, time, param, out.toByteArray());
+    }
+
+    /**
+     * 是否是SSE（Server-Sent Events）请求.<br>
+     * 判断依据：请求头 Accept 包含 text/event-stream。
+     * @param request HttpServletRequest请求对象
+     * @return true 是SSE请求，false 非SSE请求
+     */
+    public static boolean isSseRequest(HttpServletRequest request) {
+        String accept = request.getHeader(HttpHeaders.ACCEPT);
+        return accept != null && accept.toLowerCase().contains(MediaType.TEXT_EVENT_STREAM_VALUE);
     }
 
     /**
