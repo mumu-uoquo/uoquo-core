@@ -125,9 +125,9 @@ public class CheckParamInterceptor implements HandlerInterceptor {
      * 防重提交校验
      */
     protected void checkResubmit(HttpServletRequest request) throws Exception {
-        // SSE 长连接请求不做防重校验：客户端断线重连会携带相同的 nonce，
+        // SSE/WebSocket 长连接请求不做防重校验：客户端断线重连会携带相同的 nonce，
         // 且 SSE response 处于异步模式，写入普通错误响应会触发 AsyncRequestNotUsableException
-        if (WebUtil.isSseRequest(request)) {
+        if (WebUtil.isLongLivedRequest(request)) {
             return;
         }
         // 若无签名，则不做防重判断

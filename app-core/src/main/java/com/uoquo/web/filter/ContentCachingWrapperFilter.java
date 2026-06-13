@@ -47,9 +47,9 @@ public class ContentCachingWrapperFilter extends OncePerRequestFilter implements
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain chain)
             throws ServletException, IOException {
         log.debug("----------------------->ContentCachingWrapperFilter do.");
-        // 若是SSE请求，则不缓存
-        if (WebUtil.isSseRequest(request)) {
-            log.debug("当前为SSE请求，不缓存请求流和响应流：{}", request.getRequestURI());
+        // 若是SSE/WebSocket长连接请求，则不缓存
+        if (WebUtil.isLongLivedRequest(request)) {
+            log.debug("当前为长连接请求（SSE/WebSocket），不缓存请求流和响应流：{}", request.getRequestURI());
             chain.doFilter(request, response);
             return;
         }

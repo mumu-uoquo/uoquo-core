@@ -130,8 +130,8 @@ public class GlobalInterceptor implements HandlerInterceptor {
             }
         }
         // 记录响应日志（放在 postHandle 中将无法获取出错时的响应内容）
-        // SSE 长连接不记录响应体（流式推送内容无法缓存），出错时已在上方记录错误信息
-        if (logResponse.isDebugEnabled() && !WebUtil.isSseRequest(request)) {
+        // SSE/WebSocket 长连接不记录响应体（流式推送内容无法缓存），出错时已在上方记录错误信息
+        if (logResponse.isDebugEnabled() && !WebUtil.isLongLivedRequest(request)) {
             saveResponseLog(request, response);
         }
         // 清理当前线程中的缓存信息（有可能在错误处理的地方需要用到CurrentUser，所以此处不清理）
@@ -191,8 +191,8 @@ public class GlobalInterceptor implements HandlerInterceptor {
                     (ex == null) ? null : ex.getMessage());
             return;
         }
-        // 3.2 SSE 长连接不记录慢请求（连接持续时间不代表处理耗时）
-        if (WebUtil.isSseRequest(request)) {
+        // 3.2 SSE/WebSocket 长连接不记录慢请求（连接持续时间不代表处理耗时）
+        if (WebUtil.isLongLivedRequest(request)) {
             return;
         }
         // 3.3 正常信息按级别记录

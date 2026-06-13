@@ -107,8 +107,8 @@ public class WebUtil {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         String contentType = request.getHeader("Content-Type");
         contentType = (contentType == null) ? "" : contentType.toLowerCase();
-        // SSE请求不处理请求体签名（SSE为长连接流式响应，不含请求体）
-        if (!isSseRequest(request)
+        // 长连接请求（SSE/WebSocket）不处理请求体签名
+        if (!isLongLivedRequest(request)
                 && !contentType.startsWith("multipart/form-data")
                 && !contentType.startsWith("application/octet-stream")) {
             try (
@@ -128,14 +128,24 @@ public class WebUtil {
     }
 
     /**
-     * 是否是SSE（Server-Sent Events）请求.<br>
-     * 判断依据：请求头 Accept 包含 text/event-stream。
+     * 是否是长连接请求（SSE 或 WebSocket）.<br>
+     * <ul>
+     *   <li>SSE：请求头 {@code Accept: text/event-stream}</li>
+     *   <li>WebSocket：请求头 {@code Upgrade: websocket}</li>
+     * </ul>
+     * 长连接请求需跳过防重提交、慢请求日志、响应体缓存等逻辑。
      * @param request HttpServletRequest请求对象
-     * @return true 是SSE请求，false 非SSE请求
+     * @return true 是长连接请求，false 普通请求
      */
-    public static boolean isSseRequest(HttpServletRequest request) {
+    public static boolean isLongLivedRequest(HttpServletRequest request) {
+        // 1. Accept: text/event-stream → SSE（协议标准，优先判断）
         String accept = request.getHeader(HttpHeaders.ACCEPT);
-        return accept != null && accept.toLowerCase().contains(MediaType.TEXT_EVENT_STREAM_VALUE);
+        if (accept != null && accept.toLowerCase().contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
+            return true;
+        }
+        // 2. Upgrade: websocket → WebSocket 升级请求
+        String upgrade = request.getHeader(HttpHeaders.UPGRADE);
+        return "websocket".equalsIgnoreCase(upgrade);
     }
 
     /**
