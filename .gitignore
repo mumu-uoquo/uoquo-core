@@ -35,3 +35,4 @@ build/
 /temp/
 /.mvn/
 /.mybatis/
+/**/.jqwik-database

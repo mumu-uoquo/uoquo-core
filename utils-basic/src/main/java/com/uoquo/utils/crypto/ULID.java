@@ -20,7 +20,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * 参考：<a href="https://www.likecs.com/show-308629867.html">https://www.likecs.com/show-308629867.html</a>
  * 标准：6 byte（时间戳 10889年） + 10 byte（随机数） ，共 16 byte（128 bit），转换为base32为 26 字符
  * 改造：5.5 byte（时间戳 2527年）+ 4.5 byte（随机数），共 10 byte（80  bit），转换为base32为 16 字符
- * 补充：20251121 高位固定填1，防止生成字串为数字开头，可用时间将减半(16位：2248年，26位：无影响)
+ * 补充：
+ *   20251121：高位固定填1，防止生成字串为数字开头，可用时间将减半(16位：2248年，26位：无影响)
  */
 public class ULID  implements Comparable<ULID>{
 
