@@ -5,18 +5,6 @@
 
 package com.uoquo.cloud.feign;
 
-import com.uoquo.utils.StringUtil;
-import com.uoquo.utils.json.JsonUtil;
-import com.uoquo.utils.json.TypeToken;
-import com.uoquo.web.ReturnData;
-import com.uoquo.web.SystemReturnCode;
-import com.uoquo.web.exception.AbstractBaseException;
-import com.uoquo.web.exception.RemoteServiceException;
-
-import feign.FeignException;
-import feign.Response;
-import feign.codec.DecodeException;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -32,7 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.cloud.openfeign.support.SpringDecoder;
@@ -44,6 +31,19 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.util.StreamUtils;
 import org.springframework.util.TypeUtils;
 import org.springframework.web.client.HttpMessageConverterExtractor;
+
+import com.uoquo.utils.CurrentUser;
+import com.uoquo.utils.StringUtil;
+import com.uoquo.utils.json.JsonUtil;
+import com.uoquo.utils.json.TypeToken;
+import com.uoquo.web.ReturnData;
+import com.uoquo.web.SystemReturnCode;
+import com.uoquo.web.exception.AbstractBaseException;
+import com.uoquo.web.exception.RemoteServiceException;
+
+import feign.FeignException;
+import feign.Response;
+import feign.codec.DecodeException;
 
 /**
  * 描述：feign接收数据后的解码器. <br>
@@ -98,7 +98,15 @@ public class FeignDecoder extends SpringDecoder {
             Type respType = classTypeCache.computeIfAbsent(type.getTypeName(), k ->
                     TypeToken.getParameterized(ReturnData.class, type).getType()
             );
-            ReturnData<?> data = JsonUtil.deserialize(responseText, respType);
+            // Feign 接收响应时跳过加解密，微服务间传递原始值
+            boolean prevFeignRequest = CurrentUser.isFeignRequest();
+            CurrentUser.setFeignRequest(true);
+            ReturnData<?> data;
+            try {
+                data = JsonUtil.deserialize(responseText, respType);
+            } finally {
+                CurrentUser.setFeignRequest(prevFeignRequest);
+            }
             if (log.isDebugEnabled()) {
                 long end = System.currentTimeMillis();
                 String mesg = String.format("parse json time=%.3fs", (end - bgn) / 1_000F);

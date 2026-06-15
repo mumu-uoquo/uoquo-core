@@ -4,23 +4,24 @@
  */
 package com.uoquo.utils.json.jackson;
 
+import java.io.IOException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.ContextualSerializer;
+import com.uoquo.annotation.json.Sensitive;
 import com.uoquo.utils.Config;
+import com.uoquo.utils.CurrentUser;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.crypto.AES;
 import com.uoquo.utils.crypto.RSA;
 import com.uoquo.utils.crypto.SM4;
-import com.uoquo.annotation.json.Sensitive;
 import com.uoquo.utils.spring.RedisUtil;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 /**
  * 自定义脱敏 / 加密序列化器，与 {@link SensitiveDeserializer} 配对使用。
@@ -129,6 +130,11 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
             return;
         }
         if (value.isEmpty() || annotation == null) {
+            gen.writeString(value);
+            return;
+        }
+        // Feign 微服务调用时跳过加解密，传递原始值
+        if (CurrentUser.isFeignRequest()) {
             gen.writeString(value);
             return;
         }

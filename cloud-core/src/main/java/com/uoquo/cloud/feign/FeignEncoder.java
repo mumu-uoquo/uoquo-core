@@ -5,23 +5,24 @@
 
 package com.uoquo.cloud.feign;
 
-import com.uoquo.utils.StringUtil;
-import com.uoquo.utils.json.JsonUtil;
-import feign.RequestTemplate;
-import feign.codec.EncodeException;
-
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.cloud.openfeign.support.SpringEncoder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+
+import com.uoquo.utils.CurrentUser;
+import com.uoquo.utils.StringUtil;
+import com.uoquo.utils.json.JsonUtil;
+
+import feign.RequestTemplate;
+import feign.codec.EncodeException;
 
 /**
  * 描述：自定义信息编码器. <br>
@@ -51,8 +52,16 @@ public class FeignEncoder extends SpringEncoder {
         log.debug("in FeignEncoder encode");
         // 自定义序列化逻辑
         if ((requestBody != null) && isPojo(bodyType)) {
+            // Feign 发出请求时跳过加解密，微服务间传递原始值
+            boolean prevFeignRequest = CurrentUser.isFeignRequest();
+            CurrentUser.setFeignRequest(true);
+            String jsonBody;
             try {
-                String jsonBody = JsonUtil.serialize(requestBody);
+                jsonBody = JsonUtil.serialize(requestBody);
+            } finally {
+                CurrentUser.setFeignRequest(prevFeignRequest);
+            }
+            try {
                 request.body(jsonBody);
                 // 设置 Content-Type 为 JSON
                 request.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);

@@ -4,25 +4,26 @@
  */
 package com.uoquo.utils.json.jackson;
 
+import java.io.IOException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.BeanProperty;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
+import com.uoquo.annotation.json.Sensitive;
 import com.uoquo.utils.Config;
+import com.uoquo.utils.CurrentUser;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.crypto.AES;
 import com.uoquo.utils.crypto.RSA;
 import com.uoquo.utils.crypto.SM2;
 import com.uoquo.utils.crypto.SM4;
-import com.uoquo.annotation.json.Sensitive;
 import com.uoquo.utils.spring.RedisUtil;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 /**
  * 自定义解密反序列化器，与 {@link SensitiveSerializer} 配对使用。
@@ -101,6 +102,10 @@ public class SensitiveDeserializer extends JsonDeserializer<String> implements C
         }
         String raw = p.getValueAsString();
         if (raw == null || raw.isEmpty() || annotation == null) {
+            return raw;
+        }
+        // Feign 微服务调用时跳过解密，返回原始值
+        if (CurrentUser.isFeignRequest()) {
             return raw;
         }
         try {

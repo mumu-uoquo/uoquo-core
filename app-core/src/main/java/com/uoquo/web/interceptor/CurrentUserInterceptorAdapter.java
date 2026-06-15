@@ -4,26 +4,28 @@
  */
 package com.uoquo.web.interceptor;
 
-import com.uoquo.utils.CurrentUser;
-import com.uoquo.utils.IDGenerator;
-import com.uoquo.utils.StringUtil;
-import com.uoquo.utils.json.JsonUtil;
-import com.uoquo.web.BaseCacheKey;
-import com.uoquo.annotation.web.IgnoreAuth;
-import com.uoquo.web.exception.AppkeyInvalidException;
-import com.uoquo.utils.spring.RedisUtil;
-import com.uoquo.web.utils.WebUtil;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.http.HttpMethod;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import com.uoquo.annotation.web.IgnoreAuth;
+import com.uoquo.utils.CurrentUser;
+import com.uoquo.utils.IDGenerator;
+import com.uoquo.utils.SignParamUtil;
+import com.uoquo.utils.StringUtil;
+import com.uoquo.utils.json.JsonUtil;
+import com.uoquo.utils.spring.RedisUtil;
+import com.uoquo.web.BaseCacheKey;
+import com.uoquo.web.exception.AppkeyInvalidException;
+import com.uoquo.web.utils.WebUtil;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -146,11 +148,27 @@ public abstract class CurrentUserInterceptorAdapter  implements HandlerIntercept
         } else {
             CurrentUser.setClientIp(WebUtil.getClientIp(request));
         }
+        // 标记是否为内部微服务 Feign 调用（供序列化器判断是否跳过加解密）
+        CurrentUser.setFeignRequest(isFeignRequest(request));
 
         // 调试日志
         if (log.isDebugEnabled()) {
             log.debug("解析到的用户信息：{}", JsonUtil.serialize(CurrentUser.getInfo()));
         }
+    }
+
+    /**
+     * 判断是否是内部微服务 Feign 调用.
+     */
+    protected boolean isFeignRequest(HttpServletRequest request) {
+        String feignSign  = request.getHeader(CurrentUser.FEIGN_SIGN);
+        String signGlobal = request.getHeader(CurrentUser.GATEWAY_SIGN);
+        String signParams = WebUtil.getHeader(CurrentUser.SIGN_APP, request);
+        if (StringUtil.notNull(feignSign) && StringUtil.notNull(signGlobal) && StringUtil.notNull(signParams)) {
+            String calcFeignSign = SignParamUtil.sign(signParams + signGlobal, CurrentUser.getGlobalSecret());
+            return feignSign.equalsIgnoreCase(calcFeignSign);
+        }
+        return false;
     }
 
     /**

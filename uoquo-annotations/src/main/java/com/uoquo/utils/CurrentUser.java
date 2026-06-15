@@ -281,6 +281,22 @@ public class CurrentUser {
     }
 
     /**
+     * 是否是内部微服务 Feign 调用.<br>
+     * 为 true 时，序列化/反序列化将跳过 {@link com.uoquo.annotation.json.Sensitive} 注解的加解密处理，
+     * 直接传递原始值，避免微服务间数据经过加密后无法正常处理。
+     */
+    public static boolean isFeignRequest() {
+        return Boolean.TRUE.equals(local.get().getFeignRequest());
+    }
+
+    /**
+     * 标记当前请求为内部微服务 Feign 调用.
+     */
+    public static void setFeignRequest(boolean feignRequest) {
+        local.get().setFeignRequest(feignRequest);
+    }
+
+    /**
      * AppInfo简单信息
      */
     public static class AppInfo implements Serializable {
@@ -460,6 +476,7 @@ public class CurrentUser {
         private String traceId;      // 用户请求ID（服务端）
         private String appType;      // APP类型
         private String appVersion;   // APP版本
+        private Boolean feignRequest; // 是否是内部微服务 Feign 调用
 
         private UserInfo info = new UserInfo(); // 用户信息
 
@@ -560,6 +577,14 @@ public class CurrentUser {
 
         public void setInfo(UserInfo info) {
             this.info = info;
+        }
+
+        public Boolean getFeignRequest() {
+            return feignRequest;
+        }
+
+        public void setFeignRequest(Boolean feignRequest) {
+            this.feignRequest = feignRequest;
         }
     }
 }
