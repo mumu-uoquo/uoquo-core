@@ -83,7 +83,7 @@ public class Convert2TS implements ConvertInterface {
             } else {
                 sb.append("import request from \"@/utils/request\";").append(NEW_LINE);
             }
-            sb.append("const USER_BASE_URL = \"").append(baseUrl).append("\";").append(NEW_LINE);
+            sb.append("export const USER_BASE_URL = \"").append(baseUrl).append("\";").append(NEW_LINE);
             sb.append(NEW_LINE);
             // 组装Service
             sb.append("/**").append(NEW_LINE);
