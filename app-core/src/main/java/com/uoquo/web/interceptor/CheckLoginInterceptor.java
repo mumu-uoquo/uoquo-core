@@ -128,16 +128,22 @@ public class CheckLoginInterceptor implements HandlerInterceptor {
             // TODO 产生超时事件，并通知
             throw new TokenInvalidException();
         }
-        String loginTokenCacheKey = BaseCacheKey.USER_TOKEN_PREFIX + user.getUserId() +":"+ CurrentUser.getAppkey();
-        String loginToken = RedisUtil.get(loginTokenCacheKey, String.class);
-        if (StringUtil.isNull(loginToken)) {
-            log.warn("用户[{}]缓存的登录token为空，用当前token[{}]补充.", user.getUserId(), token);
-            RedisUtil.put(loginTokenCacheKey, token, user.getExpires());
-        } else if (!token.equals(loginToken)) {
-            log.debug("用户[{}]的请求token[{}]不是最新的登录token[{}]，所以当前的客户端已经被踢下线.", user.getUserId(), loginToken, token);
-            // 传入的token与最新缓存的token不一致，说明被踢下线了（在被踢时已经发布过事件，此处不重复发送）
-            RedisUtil.clearLocalCache(BaseCacheKey.USER_INFO_PREFIX + token);
-            throw new AccountKickOutException();
+        if (user.isOpsMode()) {
+            // 运维模式时，需打印日志（userName一般为运维人员的手机号，不是userId的实际账号名）
+            log.warn("运维人员[{}]以账户[{}]的角色[{}]访问[{}].", user.getUserName(), user.getUserId(), user.getCurrentRoleId(), path);
+        } else {
+            // 标准模式时，需要判断token的有效性
+            String loginTokenCacheKey = BaseCacheKey.USER_TOKEN_PREFIX + user.getUserId() +":"+ CurrentUser.getAppkey();
+            String loginToken = RedisUtil.get(loginTokenCacheKey, String.class);
+            if (StringUtil.isNull(loginToken)) {
+                log.warn("用户[{}]缓存的登录token为空，用当前token[{}]补充.", user.getUserId(), token);
+                RedisUtil.put(loginTokenCacheKey, token, user.getExpires());
+            } else if (!token.equals(loginToken)) {
+                log.debug("用户[{}]的请求token[{}]不是最新的登录token[{}]，所以当前的客户端已经被踢下线.", user.getUserId(), loginToken, token);
+                // 传入的token与最新缓存的token不一致，说明被踢下线了（在被踢时已经发布过事件，此处不重复发送）
+                RedisUtil.clearLocalCache(BaseCacheKey.USER_INFO_PREFIX + token);
+                throw new AccountKickOutException();
+            }
         }
         // 3.3 用户授权判断（校验权限）
         if (path.endsWith("/permission") || path.endsWith("/logout")) {

@@ -286,7 +286,7 @@ public class CurrentUser {
      * 直接传递原始值，避免微服务间数据经过加密后无法正常处理。
      */
     public static boolean isFeignRequest() {
-        return Boolean.TRUE.equals(local.get().getFeignRequest());
+        return local.get().isFeignRequest();
     }
 
     /**
@@ -357,6 +357,7 @@ public class CurrentUser {
         private String userName;  // 用户的登录名称
         private String realName;  // 用户的真实姓名
         private String nickName;  // 用户的昵称
+        private boolean opsMode;  // 是否运维模式
         private Integer expires = 1800;   // 过期时间（秒，默认30分钟）
         private String instituteId;       // 所属机构ID
         private String officeId;          // 所属科室ID
@@ -398,6 +399,14 @@ public class CurrentUser {
 
         public void setNickName(String nickName) {
             this.nickName = nickName;
+        }
+
+        public boolean isOpsMode() {
+            return opsMode;
+        }
+
+        public void setOpsMode(boolean opsMode) {
+            this.opsMode = opsMode;
         }
 
         public Integer getExpires() {
@@ -476,7 +485,7 @@ public class CurrentUser {
         private String traceId;      // 用户请求ID（服务端）
         private String appType;      // APP类型
         private String appVersion;   // APP版本
-        private Boolean feignRequest; // 是否是内部微服务 Feign 调用
+        private boolean feignRequest; // 是否是内部微服务 Feign 调用
 
         private UserInfo info = new UserInfo(); // 用户信息
 
@@ -579,11 +588,11 @@ public class CurrentUser {
             this.info = info;
         }
 
-        public Boolean getFeignRequest() {
+        public boolean isFeignRequest() {
             return feignRequest;
         }
 
-        public void setFeignRequest(Boolean feignRequest) {
+        public void setFeignRequest(boolean feignRequest) {
             this.feignRequest = feignRequest;
         }
     }
