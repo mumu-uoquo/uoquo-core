@@ -44,8 +44,9 @@ public class StringUtil {
         RANDOM_CHAR.put(1, "0123456789");
         RANDOM_CHAR.put(2, "abcdefghijklmnopqrstuvwxyz");
         RANDOM_CHAR.put(3, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-        RANDOM_CHAR.put(4, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-        RANDOM_CHAR.put(5, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+        RANDOM_CHAR.put(4, "ABCDEFGHIJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxy");
+        RANDOM_CHAR.put(5, "ABCDEFGHIJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxy0123456789");
+        RANDOM_CHAR.put(6, "ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789");
         RANDOM_CHAR.put(9999, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&()_-.><{}[]|/,=");
     }
 
@@ -171,9 +172,9 @@ public class StringUtil {
 
     /**
      * 随机字符串. <br>
-     * 类型（1:数字、2:小写字母、3：大写字母、4：所有字母、5：字母+数字、其他（默认）：字母+数字+特殊字符）
+     * 类型（1:数字、2:小写字母、3：大写字母、4：所有字母、5：所有字母+数字、6：大写字母+数字、其他（默认）：字母+数字+特殊字符）
      * @param len  长度
-     * @param type 类型（1:数字、2:小写字母、3：大写字母、4：所有字母、5：字母+数字、其他（默认）：字母+数字+特殊字符）
+     * @param type 类型（1:数字、2:小写字母、3：大写字母、4：所有字母、5：所有字母+数字、6：大写字母+数字、其他（默认）：字母+数字+特殊字符）
      * @return 随机字符串
      */
     public static String getRandomString(int len, Integer type) {
