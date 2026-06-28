@@ -23,6 +23,7 @@ import com.uoquo.utils.crypto.AES;
 import com.uoquo.utils.crypto.RSA;
 import com.uoquo.utils.crypto.SM2;
 import com.uoquo.utils.crypto.SM4;
+import com.uoquo.utils.crypto.TimeStepCryptoUtil;
 import com.uoquo.utils.spring.RedisUtil;
 
 /**
@@ -53,17 +54,11 @@ public class SensitiveDeserializer extends JsonDeserializer<String> implements C
     /** 字段上的注解，由 {@link #createContextual(DeserializationContext, BeanProperty)} 注入；为 null 时按普通 String 处理。 */
     private final Sensitive annotation;
 
-    /** 时间片密钥目标长度（位数 + 后置补 0），与 AES 128 / SM4 的 16 字节块对齐. */
-    private static final int TIME_STEP_KEY_LENGTH = 16;
-
     /** 对称密钥（AES / SM4 共用），延迟初始化，使用双重校验锁 + volatile 保证可见性. */
     private volatile String securityAesKey;
 
     /** RSA 私钥，延迟初始化，使用双重校验锁 + volatile 保证可见性. */
     private volatile String securityPrivateKey;
-
-    /** 时间片长度（毫秒），延迟初始化，使用双重校验锁 + volatile 保证可见性. */
-    private volatile Integer securityTimeStep;
 
     public SensitiveDeserializer() {
         this(null);
@@ -192,8 +187,8 @@ public class SensitiveDeserializer extends JsonDeserializer<String> implements C
                 try {
                     return SM2.decrypt(value, priKey);
                 } catch (Exception e) {
-                    log.warn("SM2 解密失败，降级为TAES解密：{}", e.getMessage());
-                    return tryTimeStepDecrypt(value, false);
+                    log.warn("SM2 解密失败，降级为TSM4解密：{}", e.getMessage());
+                    return tryTimeStepDecrypt(value, true);
                 }
             }
 
@@ -225,31 +220,10 @@ public class SensitiveDeserializer extends JsonDeserializer<String> implements C
      * @param sm4   true 使用 SM4，false 使用 AES
      */
     private String tryTimeStepDecrypt(String value, boolean sm4) {
-        checkTimeStep();
-        long currentStep = System.currentTimeMillis() / securityTimeStep;
-        Exception lastError = null;
-        for (long delta = 0; delta <= 1; delta++) {
-            String key = generateTimeStepKey(currentStep - delta);
-            try {
-                return sm4 ? SM4.decrypt(value, key) : AES.decrypt(value, key);
-            } catch (Exception e) {
-                lastError = e;
-            }
-        }
-        log.warn("{} 时间片解密失败（已尝试当前/上一时间片）：{}",
-                sm4 ? "TSM4" : "TAES",
-                lastError.getMessage());
-        return value;
+        return sm4 ? TimeStepCryptoUtil.decryptTSM4(value) : TimeStepCryptoUtil.decryptTAES(value);
     }
 
-    private String generateTimeStepKey(long time) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(time);
-        if (sb.length() < TIME_STEP_KEY_LENGTH) {
-            sb.append("0".repeat(TIME_STEP_KEY_LENGTH - sb.length()));
-        }
-        return sb.toString();
-    }
+
 
     /**
      * AES KEY 初始化（双重校验锁）.
@@ -289,22 +263,5 @@ public class SensitiveDeserializer extends JsonDeserializer<String> implements C
         }
     }
 
-    /**
-     * 时间片长度初始化（双重校验锁）；单位毫秒.
-     */
-    private void checkTimeStep() {
-        if (securityTimeStep != null) {
-            return;
-        }
-        synchronized (getClass()) {
-            if (securityTimeStep != null) {
-                return;
-            }
-            Integer step = RedisUtil.get("security.aes.time-step", Integer.class);
-            if (step == null) {
-                step = Config.getInt("app.security.aes.time-step", 5);
-            }
-            securityTimeStep = step * 1000;
-        }
-    }
+
 }

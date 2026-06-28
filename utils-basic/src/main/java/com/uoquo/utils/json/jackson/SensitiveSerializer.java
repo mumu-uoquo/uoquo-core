@@ -21,6 +21,7 @@ import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.crypto.AES;
 import com.uoquo.utils.crypto.RSA;
 import com.uoquo.utils.crypto.SM4;
+import com.uoquo.utils.crypto.TimeStepCryptoUtil;
 import com.uoquo.utils.spring.RedisUtil;
 
 /**
@@ -57,9 +58,6 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
     /** 默认替换字符（脱敏处理）. */
     private static final String DEFAULT_REPLACEMENT = "*";
 
-    /** 时间片密钥目标长度（位数 + 后置补 0），与 AES 128 / SM4 的 16 字节块对齐. */
-    private static final int TIME_STEP_KEY_LENGTH = 16;
-
     /** 字段上的注解，由 {@link #createContextual(SerializerProvider, BeanProperty)} 注入；为 null 时按普通 String 处理. */
     private final Sensitive annotation;
 
@@ -68,9 +66,6 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
 
     /** RSA 私钥，延迟初始化，使用双重校验锁 + volatile 保证可见性. */
     private volatile String securityPrivateKey;
-
-    /** 时间片长度（毫秒），延迟初始化，使用双重校验锁 + volatile 保证可见性. */
-    private volatile Integer securityTimeStep;
 
     /**
      * 默认构造器，由 Jackson 通过 {@code addSerializer} 或 AnnotationIntrospector 注册时调用.
@@ -273,13 +268,7 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
      * @return 加密结果或原值
      */
     private String tryEncryptTimeStep(String value, boolean sm4) {
-        try {
-            String key = generateTimeStepKey();
-            return sm4 ? SM4.encrypt(value, key) : AES.encrypt(value, key);
-        } catch (Exception e) {
-            log.warn("{} 时间片加密失败：{}", sm4 ? "TSM4" : "TAES", e.getMessage());
-            return value;
-        }
+        return sm4 ? TimeStepCryptoUtil.encryptTSM4(value) : TimeStepCryptoUtil.encryptTAES(value);
     }
 
     /**
@@ -439,41 +428,5 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
         }
     }
 
-    /**
-     * 时间片长度初始化（毫秒）：先取缓存 {@code security.aes.time-step}，再取配置 {@code app.security.aes.time-step}，
-     * 默认 5 秒.
-     * <p>使用类对象锁避免锁歧义，结合 {@code volatile} 字段确保可见性。</p>
-     */
-    private void checkTimeStep() {
-        if (securityTimeStep != null) {
-            return;
-        }
-        synchronized (getClass()) {
-            if (securityTimeStep != null) {
-                return;
-            }
-            Integer step = RedisUtil.get("security.aes.time-step", Integer.class);
-            if (step == null) {
-                step = Config.getInt("app.security.aes.time-step", 5);
-            }
-            securityTimeStep = step * 1000;
-        }
-    }
 
-    /**
-     * 基于当前时间生成时间片密钥：
-     * {@code timeMs / timeStepMs} 取整后转为字符串，长度不足 16 时后置补 0.
-     *
-     * @return 16 字符的时间片密钥
-     */
-    private String generateTimeStepKey() {
-        checkTimeStep();
-        long step = System.currentTimeMillis() / securityTimeStep;
-        StringBuilder sb = new StringBuilder();
-        sb.append(step);
-        if (sb.length() < TIME_STEP_KEY_LENGTH) {
-            sb.append("0".repeat(TIME_STEP_KEY_LENGTH - sb.length()));
-        }
-        return sb.toString();
-    }
 }
