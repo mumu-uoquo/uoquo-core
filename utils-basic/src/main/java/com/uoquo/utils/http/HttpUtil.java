@@ -1034,6 +1034,18 @@ public class HttpUtil {
             //OkHttpClient client = (cookies == null) ? getClientPool() : getClientOnce(cookies);
             OkHttpClient client = getClientOnce(cookies);
             response = execute(client, request, headers, null);
+            
+            // 记录下载响应信息（info级别）- 只记录响应头，不记录响应体
+            if (log.isInfoEnabled()) {
+                Map<String, List<String>> headerMap = response.headers().toMultimap();
+                int statusCode = response.code();
+                String message = response.message();
+                long contentLength = response.body() != null ? response.body().contentLength() : 0;
+                
+                log.info("HTTP Download Response: status={}, message={}, content-length={}, headers={}, body=[download stream]", 
+                        statusCode, message, contentLength, headerMap);
+            }
+            
             if ((response == null) || (response.code() != 200)) {
                 throw new Exception(response == null ? "" : String.valueOf(response.code()));
             }
@@ -1126,8 +1138,73 @@ public class HttpUtil {
             }
         }
         
-        // 执行请
+        // 执行请求
         Request req = request.build();
+        
+        // 记录请求信息（info级别）
+        if (log.isInfoEnabled()) {
+            Map<String, List<String>> headerMap = req.headers().toMultimap();
+            String uri = req.url().toString();
+            if (uri.length() > 500) {
+                uri = uri.substring(0, 500) + "...";
+            }
+            RequestBody body = req.body();
+            
+            // 判断是否为流式上传（不记录请求体）
+            boolean isStreamUpload = false;
+            if (body != null && body.contentType() != null) {
+                MediaType contentType = body.contentType();
+                // 检查是否是 application/octet-stream（流式上传）
+                if (contentType != null && "application/octet-stream".equals(contentType.toString())) {
+                    isStreamUpload = true;
+                }
+                // 检查是否是 multipart/form-data（文件上传）
+                if (contentType != null && contentType.toString().startsWith("multipart/form-data")) {
+                    // 文件上传，不记录请求体内容
+                    log.info("HTTP Request: uri={}, method={}, headers={}, tag={}, body=[multipart/form-data file upload]", 
+                            uri, req.method(), headerMap, req.tag());
+                } else if (isStreamUpload) {
+                    // 流式上传，不记录请求体内容
+                    log.info("HTTP Request: uri={}, method={}, headers={}, tag={}, body=[stream upload]", 
+                            uri, req.method(), headerMap, req.tag());
+                } else if (body instanceof FormBody temp) {
+                    // Form 表单数据
+                    List<Map<String, String>> params = new ArrayList<>();
+                    for (int i = 0; i < temp.size(); i++) {
+                        Map<String, String> map = new HashMap<>();
+                        String val = temp.value(i);
+                        if (val.length() > 300) {
+                            val = val.substring(0, 300) + "...";
+                        }
+                        map.put(temp.name(i), val);
+                        params.add(map);
+                    }
+                    log.info("HTTP Request: uri={}, method={}, headers={}, tag={}, params={}", 
+                            uri, req.method(), headerMap, req.tag(), params);
+                } else if (Objects.equals(body.contentType(), MEDIA_JSON)) {
+                    // JSON 数据
+                    String bodyStr = req.body().toString();
+                    if (bodyStr.length() > 1000) {
+                        bodyStr = bodyStr.substring(0, 1000) + "...";
+                    }
+                    log.info("HTTP Request: uri={}, method={}, headers={}, tag={}, body={}", 
+                            uri, req.method(), headerMap, req.tag(), bodyStr);
+                } else if (body.contentLength() == 0) {
+                    // 空请求体
+                    log.info("HTTP Request: uri={}, method={}, headers={}, tag={}, body=[empty]", 
+                            uri, req.method(), headerMap, req.tag());
+                } else {
+                    // 其他类型的请求体
+                    log.info("HTTP Request: uri={}, method={}, headers={}, tag={}, body=[other type: {}]", 
+                            uri, req.method(), headerMap, req.tag(), body.contentType());
+                }
+            } else {
+                // 无请求体
+                log.info("HTTP Request: uri={}, method={}, headers={}, tag={}", 
+                        uri, req.method(), headerMap, req.tag());
+            }
+        }
+        
         try {
             Call call = client.newCall(req);
             if (callback != null) {
@@ -1182,8 +1259,29 @@ public class HttpUtil {
         }
         try (response) {
             ResponseBody body = response.body();
+            
+            // 记录响应信息（info级别）- 普通HTTP请求
+            if (log.isInfoEnabled()) {
+                Map<String, List<String>> headerMap = response.headers().toMultimap();
+                int statusCode = response.code();
+                String message = response.message();
+                
+                // 记录响应头信息
+                log.info("HTTP Response: status={}, message={}, headers={}", 
+                        statusCode, message, headerMap);
+            }
+            
             if (body != null) {
                 String temp = body.string();
+                // 记录响应体信息（如果开启了日志且响应体不为空）
+                if (log.isInfoEnabled() && StringUtil.notNull(temp)) {
+                    String truncatedBody = temp;
+                    if (truncatedBody.length() > 2000) {
+                        truncatedBody = truncatedBody.substring(0, 2000) + "...";
+                    }
+                    log.info("HTTP Response Body: {}", truncatedBody);
+                }
+                
                 if (StringUtil.notNull(temp)) {
                     return temp;
                 } else if (response.code() == 200) {
