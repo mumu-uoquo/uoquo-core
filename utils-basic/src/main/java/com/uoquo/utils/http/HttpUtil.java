@@ -5,30 +5,19 @@
 
 package com.uoquo.utils.http;
 
-import com.uoquo.utils.Config;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.crypto.MD5;
-import com.uoquo.utils.http.listener.EventLogTimeListener;
 import com.uoquo.utils.http.listener.ProgressDownloadListener;
 import com.uoquo.utils.http.listener.ProgressUploadListener;
-import com.uoquo.utils.json.JsonUtil;
 
 import java.io.*;
-
 import java.net.FileNameMap;
 import java.net.URLConnection;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyStore;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import okhttp3.Call;
 import okhttp3.Callback;
-import okhttp3.ConnectionPool;
-import okhttp3.Cookie;
-import okhttp3.CookieJar;
 import okhttp3.FormBody;
-import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -68,153 +57,23 @@ public class HttpUtil {
     private static final int BUF_SIZE = 1024 * 1024;
     
     private static final MediaType MEDIA_JSON = MediaType.parse("application/json; charset=utf-8");
-
-    private static volatile OkHttpClient clientPool = null;
-    /* 
-    // 枚举类实现单例
-    public enum ClientPool {
-        CLIENT;
-        
-        private OkHttpClient instance;
-        
-        ClientPool() {
-            OkHttpClient.Builder builder = getClientBuilder();
-            // 添加连接池（默认会创建maxIdle = 5，keepAlive = 5的连接池）
-            int maxIdle   = Config.getInt("app.http.pool.maxIdle",   5);   // 最大空闲连接数（多余的会销毁），默认5个.
-            int keepAlive = Config.getInt("app.http.pool.keepAlive", 300); // 连接存活时间（分钟），默认5分钟.
-            if ((maxIdle > 0) && (keepAlive > 0)) {
-                builder.connectionPool(new ConnectionPool(maxIdle, keepAlive, TimeUnit.SECONDS));
-            }
-            instance = builder.build();
-        }
-        
-        public OkHttpClient getInstance() {
-            return instance;
-        }
-    }
-    */
+    
+    // ====================================================================
+    // 客户端管理（优化版本）
+    // ====================================================================
     
     /**
-     * 获取http连接池对象.<br>
-     * 备注：主要用于普通get、post、json数据请求，上传、下载、及cookie传输需要每次新建对象
+     * 获取一次性 HTTP 客户端（用于上传、下载等特殊操作，使用HttpClientBuilder）
+     * 私有方法，只在HttpUtil内部使用
      */
-    public static OkHttpClient getClientPool() {
-        //return ClientPool.CLIENT.getInstance();
-        // DCL生成单例
-        if (clientPool == null) {
-            OkHttpClient.Builder builder = getClientBuilder();
-            // 添加连接池（默认会创建maxIdle = 5，keepAlive = 5的连接池）
-            int maxIdle   = Config.getInt("app.http.pool.max-idle",   5); // 最大空闲连接数（多余的会销毁），默认5个.
-            int keepAlive = Config.getInt("app.http.pool.keep-alive", 300); // 连接存活时间（分钟），默认5分钟.
-            if ((maxIdle > 0) && (keepAlive > 0)) {
-                builder.connectionPool(new ConnectionPool(maxIdle, keepAlive, TimeUnit.SECONDS));
-            }
-            
-            synchronized (HttpUtil.class) {
-                if (clientPool == null) {
-                    clientPool = builder.build();
-                }
-            }
-        }
-        return clientPool;
+    private static OkHttpClient getClientOnce(HttpCookies cookies) {
+        return HttpClientBuilder.buildWithCookies(cookies);
     }
     
-    /**
-     * 获取新的http对象.<br>
-     * 备注：主要用于上传、下载、及有cookie的连接
-     * @param cookies  自定义cookie
-     */
-    public static OkHttpClient getClientOnce(HttpCookies cookies) {
-        OkHttpClient.Builder builder = getClientBuilder();
-        builder.connectionPool(new ConnectionPool(1, 1, TimeUnit.MINUTES)); // 不设置的话，默认会创建maxIdle = 5，keepAlive = 5的连接池
-        // 添加自定义cookie
-        if ((cookies != null) && cookies.exist()) {
-            builder.cookieJar(new CookieJar() {
-                @Override 
-                public void saveFromResponse(@NonNull HttpUrl url, @NonNull List<Cookie> cookies) {
-                    // do nothing
-                }
-
-                @NonNull
-                @Override 
-                public List<Cookie> loadForRequest(@NonNull HttpUrl url) {
-                    List<Cookie> list = new ArrayList<Cookie>();
-                    try {
-                        for (String key : cookies.get().keySet()) {
-                            String val = cookies.get(key);
-                            Cookie cookie = new Cookie.Builder()
-                                    .hostOnlyDomain(url.host())
-                                    .name(key).value(val)
-                                    .build();
-                            list.add(cookie);
-                        }
-                    } catch (Exception e) {
-                        // do nothing
-                    }
-                    return list;
-                }
-            });
-        }
-        return builder.build();
-    }
     
-    /**
-     * client builder.
-     */
-    public static OkHttpClient.Builder getClientBuilder() {
-        // LOG
-        //HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
-        //loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-
-        int connectTimeout = Config.getInt("app.http.pool.timeout.connect", 2);  // 建立连接超时时间（秒），默认2秒.
-        int readTimeout    = Config.getInt("app.http.pool.timeout.read",    10); // 数据传输超时时间（秒），默认4秒.
-        int writeTimeout   = Config.getInt("app.http.pool.timeout.write",   10); // 请求响应超时时间（秒），默认5秒.
-        // 基本设置（负数表示不限制，但okhttp不支持负数，因此将其转换为一个比较大的数值）
-        connectTimeout = (connectTimeout <= 0) ? 10 : connectTimeout;
-        readTimeout    = (readTimeout    <= 0) ? 50 : readTimeout;
-        writeTimeout   = (writeTimeout   <= 0) ? 50 : writeTimeout;
-        OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                .connectTimeout(connectTimeout, TimeUnit.SECONDS)
-                .readTimeout(readTimeout,       TimeUnit.SECONDS)
-                .writeTimeout(writeTimeout,     TimeUnit.SECONDS)
-                .eventListenerFactory(EventLogTimeListener.FACTORY) // 请求耗时记录
-                .dns(new UoquoDns())            // 自定义DNS解析
-                .retryOnConnectionFailure(true)  // 连接建立失败，是否重试？该值需要好好观察，看看是否需要重试
-                //.addInterceptor(loggingInterceptor) // 加入Log拦截器
-                ;
-        boolean trustAll = Config.getBoolean("app.http.trustAll", false);
-        if (!trustAll) {
-            return builder;
-        }
-
-        // 添加SSL处理（信任所有）
-        try {
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustManagerFactory.init((KeyStore) null);
-            TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
-            if (trustManagers.length != 1 || !(trustManagers[0] instanceof X509TrustManager trustManager)) {
-                throw new IllegalStateException("Unexpected default trust managers:" + Arrays.toString(trustManagers));
-            }
-
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new TrustManager[] { trustManager }, null);
-            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
-            
-            // 添加所有信任至builder对象
-            builder.sslSocketFactory(sslSocketFactory, trustManager);
-            builder.hostnameVerifier(new HostnameVerifier() {
-                @Override
-                public boolean verify(String hostname, SSLSession session) {
-                    // 信任所有
-                    return true;
-                }
-            });
-        } catch (Exception e) {
-            // do nothing
-        }
-        return builder;
-    }
-    
+    // ====================================================================
+    // GET 请求（使用HttpRequestExecutor）
+    // ====================================================================
     
     /**
      * GET请求.
@@ -237,26 +96,17 @@ public class HttpUtil {
      * @throws Exception 错误信息
      */
     public static String get(String url, HttpParams parms, HttpHeaders headers, HttpCookies cookies) throws Exception {
-        // 设置请求数据
-        if ((parms != null) && parms.existFormParam()) {
-            StringBuilder urlBuilder = new StringBuilder();
-            urlBuilder.append(url);
-            if (url.indexOf("?") > 0) {
-                urlBuilder.append("&");
-            } else {
-                urlBuilder.append("?");
-            }
-            urlBuilder.append(parms.getURLEncodedParams());
-            url = urlBuilder.toString();
-        }
-        // 请求内容
-        Request.Builder request = new Request.Builder();
-        request.get().url(url);
-        // 执行请求
-        OkHttpClient client = (cookies == null) ? getClientPool() : getClientOnce(cookies);
-        Response response = execute(client, request, headers, null);
-        return parseResponse2String(response);
+        // 使用 HttpRequestExecutor 执行 GET 请求（包含完整日志）
+        return HttpRequestExecutor.executeForString(
+            HttpRequestExecutor.buildGetRequest(url, parms),
+            headers,
+            cookies
+        );
     }
+    
+    // ====================================================================
+    // POST 请求（使用HttpRequestExecutor）
+    // ====================================================================
     
     /**
      * POST请求.
@@ -279,25 +129,177 @@ public class HttpUtil {
      * @throws Exception 错误信息
      */
     public static String post(String url, HttpParams parms, HttpHeaders headers, HttpCookies cookies) throws Exception {
-        Request.Builder request = new Request.Builder();
-        // 设置请求数据
-        if ((parms != null) && parms.existFormParam()) {
-            FormBody.Builder formBody = new FormBody.Builder();
-            Map<String, String> params = parms.getFormParams();
-            for (String key : params.keySet()) {
-                formBody.add(key, params.get(key));
-            }
-            request.post(formBody.build());
-        } else {
-            // 空请求参数
-            request.post(Util.EMPTY_REQUEST);
-        }
-        request.url(url);
-        // 执行请求
-        OkHttpClient client = (cookies == null) ? getClientPool() : getClientOnce(cookies);
-        Response response = execute(client, request, headers, null);
-        return parseResponse2String(response);
+        // 使用 HttpRequestExecutor 执行 POST 请求（包含完整日志）
+        return HttpRequestExecutor.executeForString(
+            HttpRequestExecutor.buildPostRequest(url, parms),
+            headers,
+            cookies
+        );
     }
+    
+    // ====================================================================
+    // 通用 POST 请求（支持自定义请求体，如 SOAP、XML 等）
+    // ====================================================================
+    
+    /**
+     * 通用 POST 请求（支持自定义请求体和媒体类型）
+     * 适用于 SOAP、XML、自定义格式等
+     * 
+     * @param url 请求地址
+     * @param bodyContent 请求体内容（字符串）
+     * @param mediaType 媒体类型，如 "text/xml; charset=utf-8"
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String post(String url, String bodyContent, String mediaType) throws Exception {
+        return post(url, bodyContent, mediaType, null, null);
+    }
+    
+    /**
+     * 通用 POST 请求（支持自定义请求体和媒体类型）
+     * 
+     * @param url 请求地址
+     * @param bodyContent 请求体内容（字符串）
+     * @param mediaType 媒体类型，如 "text/xml; charset=utf-8"
+     * @param headers 自定义请求头
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String post(String url, String bodyContent, String mediaType, HttpHeaders headers) throws Exception {
+        return post(url, bodyContent, mediaType, headers, null);
+    }
+    
+    /**
+     * 通用 POST 请求（支持自定义请求体和媒体类型）
+     * 
+     * @param url 请求地址
+     * @param bodyContent 请求体内容（字符串）
+     * @param mediaType 媒体类型，如 "text/xml; charset=utf-8"
+     * @param headers 自定义请求头
+     * @param cookies 自定义cookie
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String post(String url, String bodyContent, String mediaType, 
+                                    HttpHeaders headers, HttpCookies cookies) throws Exception {
+        // 使用 HttpRequestExecutor 执行通用 POST 请求
+        return HttpRequestExecutor.executeForString(
+            HttpRequestExecutor.buildGenericPostRequest(url, bodyContent, mediaType),
+            headers,
+            cookies
+        );
+    }
+    
+    /**
+     * 通用 POST 请求（支持字节数组请求体）
+     * 
+     * @param url 请求地址
+     * @param bodyContent 请求体内容（字节数组）
+     * @param mediaType 媒体类型
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String post(String url, byte[] bodyContent, MediaType mediaType) throws Exception {
+        return post(url, bodyContent, mediaType, null, null);
+    }
+    
+    /**
+     * 通用 POST 请求（支持字节数组请求体）
+     * 
+     * @param url 请求地址
+     * @param bodyContent 请求体内容（字节数组）
+     * @param mediaType 媒体类型
+     * @param headers 自定义请求头
+     * @param cookies 自定义cookie
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String post(String url, byte[] bodyContent, MediaType mediaType,
+                                    HttpHeaders headers, HttpCookies cookies) throws Exception {
+        // 使用 HttpRequestExecutor 执行通用 POST 请求
+        return HttpRequestExecutor.executeForString(
+            HttpRequestExecutor.buildGenericPostRequest(url, bodyContent, mediaType),
+            headers,
+            cookies
+        );
+    }
+    
+    /**
+     * SOAP 请求（专用方法）
+     * 
+     * @param url SOAP服务地址
+     * @param soapBody SOAP消息体
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String postSoap(String url, String soapBody) throws Exception {
+        return postSoap(url, soapBody, null, null);
+    }
+    
+    /**
+     * SOAP 请求（专用方法）
+     * 
+     * @param url SOAP服务地址
+     * @param soapBody SOAP消息体
+     * @param headers 自定义请求头（可添加SOAPAction等）
+     * @param cookies 自定义cookie
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String postSoap(String url, String soapBody, HttpHeaders headers, HttpCookies cookies) throws Exception {
+        // 确保有正确的SOAP请求头
+        if (headers == null) {
+            headers = new HttpHeaders();
+        }
+        
+        // 添加常见的SOAP头
+        if (!headers.exist("Content-Type")) {
+            headers.add("Content-Type", "text/xml; charset=utf-8");
+        }
+        
+        // 使用通用POST方法发送SOAP请求
+        return post(url, soapBody, "text/xml; charset=utf-8", headers, cookies);
+    }
+    
+    /**
+     * XML 请求（专用方法）
+     * 
+     * @param url 服务地址
+     * @param xmlBody XML消息体
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String postXml(String url, String xmlBody) throws Exception {
+        return postXml(url, xmlBody, null, null);
+    }
+    
+    /**
+     * XML 请求（专用方法）
+     * 
+     * @param url 服务地址
+     * @param xmlBody XML消息体
+     * @param headers 自定义请求头
+     * @param cookies 自定义cookie
+     * @return String 响应消息
+     * @throws Exception 错误信息
+     */
+    public static String postXml(String url, String xmlBody, HttpHeaders headers, HttpCookies cookies) throws Exception {
+        // 确保有正确的XML请求头
+        if (headers == null) {
+            headers = new HttpHeaders();
+        }
+        
+        if (!headers.exist("Content-Type")) {
+            headers.add("Content-Type", "application/xml; charset=utf-8");
+        }
+        
+        // 使用通用POST方法发送XML请求
+        return post(url, xmlBody, "application/xml; charset=utf-8", headers, cookies);
+    }
+    
+    // ====================================================================
+    // JSON 请求（使用HttpRequestExecutor）
+    // ====================================================================
     
     /**
      * JSON数据请求（POST）.<br>
@@ -350,73 +352,21 @@ public class HttpUtil {
      * @throws Exception 错误信息
      */
     public static String json(String url, HttpParams parms, Object json, HttpHeaders headers, HttpCookies cookies) throws Exception {
-        // 设置请求数据
-        if ((parms != null) && parms.existFormParam()) {
-            StringBuilder urlBuilder = new StringBuilder();
-            urlBuilder.append(url);
-            if (url.indexOf("?") > 0) {
-                urlBuilder.append("&");
-            } else {
-                urlBuilder.append("?");
-            }
+        // 处理 URL 参数
+        String fullUrl = url;
+        if (parms != null && parms.existFormParam()) {
+            StringBuilder urlBuilder = new StringBuilder(url);
+            urlBuilder.append(url.contains("?") ? "&" : "?");
             urlBuilder.append(parms.getURLEncodedParams());
-            url = urlBuilder.toString();
-        }
-        // 设置请求数据
-        String jsonStr = "";
-        if (json != null) {
-            if (json instanceof HttpParams temp) {
-                if (temp.existFormParam()) {
-                    jsonStr = JsonUtil.serialize(temp.getJsonParams());
-                }
-            } else if (json instanceof String) {
-                jsonStr = (String)json;
-            } else {
-                jsonStr = JsonUtil.serialize(json);
-            }
-        }
-        RequestBody body;
-        if (StringUtil.notNull(jsonStr)) {
-            try {
-                body = createJsonBody(jsonStr.getBytes(StandardCharsets.UTF_8));
-            } catch (Exception e) {
-                body = createJsonBody(jsonStr.getBytes());
-            }
-        } else {
-            body = createJsonBody(Util.EMPTY_BYTE_ARRAY);
+            fullUrl = urlBuilder.toString();
         }
         
-        Request.Builder request = new Request.Builder();
-        request.post(body).url(url);
-        
-        // 执行请求
-        OkHttpClient client = (cookies == null) ? getClientPool() : getClientOnce(cookies);
-        Response response = execute(client, request, headers, null);
-        return parseResponse2String(response);
-    }
-    
-    /**
-     * 构建JSON请求体.<br>
-     * 备注：重写toString，便于日志输出
-     */
-    private static RequestBody createJsonBody(final byte[] content) {
-        return new RequestBody() {
-            @Override public MediaType contentType() {
-                return MEDIA_JSON;
-            }
-
-            @Override public long contentLength() {
-                return content.length;
-            }
-
-            @Override public void writeTo(@NonNull BufferedSink sink) throws IOException {
-                sink.write(content, 0, content.length);
-            }
-            
-            @Override public String toString() {
-                return new String(content, StandardCharsets.UTF_8);
-            }
-        };
+        // 使用 HttpRequestExecutor 执行 JSON 请求（包含完整日志）
+        return HttpRequestExecutor.executeForString(
+            HttpRequestExecutor.buildJsonRequest(fullUrl, json),
+            headers,
+            cookies
+        );
     }
     
     /**
@@ -551,8 +501,7 @@ public class HttpUtil {
             request.post(Util.EMPTY_REQUEST);
         }
         request.url(url);
-        // 执行请求（暂时不复用client）
-        //OkHttpClient client = (cookies == null) ? getClientPool() : getClientOnce(cookies);
+        // 执行请求
         OkHttpClient client = getClientOnce(cookies);
         Response response = execute(client, request, headers, null);
         return parseResponse2String(response);
@@ -630,8 +579,7 @@ public class HttpUtil {
             request.post(body);
         }
         request.url(url);
-        // 执行请求（暂时不复用client）
-        //OkHttpClient client = (cookies == null) ? getClientPool() : getClientOnce(cookies);
+        // 执行请求
         OkHttpClient client = getClientOnce(cookies);
         Response response = execute(client, request, headers, null);
         return parseResponse2String(response);
@@ -1030,8 +978,7 @@ public class HttpUtil {
         Response response = null;
         try {
             // 返回结果如果不是200，则说明有错误
-            // 执行请求（暂时不复用client）
-            //OkHttpClient client = (cookies == null) ? getClientPool() : getClientOnce(cookies);
+            // 执行请求
             OkHttpClient client = getClientOnce(cookies);
             response = execute(client, request, headers, null);
             
