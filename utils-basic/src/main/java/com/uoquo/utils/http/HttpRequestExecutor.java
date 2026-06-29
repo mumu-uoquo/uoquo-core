@@ -129,7 +129,7 @@ public class HttpRequestExecutor {
     public static Request.Builder buildGetRequest(String url, HttpParams params) {
         StringBuilder urlBuilder = new StringBuilder(url);
         
-        if (params != null && params.existFormParam()) {
+        if ((params != null) && !params.emptyFormParam()) {
             urlBuilder.append(url.contains("?") ? "&" : "?");
             urlBuilder.append(params.getURLEncodedParams());
         }
@@ -144,8 +144,8 @@ public class HttpRequestExecutor {
      */
     public static Request.Builder buildPostRequest(String url, HttpParams params) {
         RequestBody body = FormBody.create(new byte[0], null);
-        
-        if (params != null && params.existFormParam()) {
+
+        if ((params != null) && !params.emptyFormParam()) {
             FormBody.Builder formBody = new FormBody.Builder();
             Map<String, String> formParams = params.getFormParams();
             for (Map.Entry<String, String> entry : formParams.entrySet()) {
@@ -402,7 +402,7 @@ public class HttpRequestExecutor {
      * 添加请求头
      */
     private static void addHeaders(Request.Builder builder, HttpHeaders headers) {
-        if (headers != null && headers.exist()) {
+        if (headers != null && !headers.empty()) {
             try {
                 for (Map.Entry<String, String> entry : headers.get().entrySet()) {
                     builder.addHeader(entry.getKey(), entry.getValue());
@@ -433,7 +433,7 @@ public class HttpRequestExecutor {
         }
         
         if (json instanceof HttpParams params) {
-            return params.existFormParam() ? JsonUtil.serialize(params.getJsonParams()) : "";
+            return params.emptyFormParam() ? "" : JsonUtil.serialize(params.getJsonParams()) ;
         } else if (json instanceof String) {
             return (String) json;
         } else {

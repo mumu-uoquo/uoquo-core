@@ -7,10 +7,9 @@ package com.uoquo.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uoquo.utils.*;
-import com.uoquo.utils.http.HttpUtil;
+import com.uoquo.utils.http.HttpClientBuilder;
 import com.uoquo.utils.json.JsonUtil;
 
-import okhttp3.ConnectionPool;
 import okhttp3.OkHttpClient;
 
 import org.slf4j.Logger;
@@ -22,7 +21,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import jakarta.annotation.PostConstruct;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 描述：项目全局配置. <br>
@@ -60,13 +58,7 @@ public class ServiceConfig {
     @ConditionalOnMissingBean(value = OkHttpClient.class, search = SearchStrategy.CURRENT)
     public OkHttpClient okHttpClient() {
         log.debug("加载BEAN：OkHttpClient");
-        int maxIdle   = Config.getInt("app.http.pool.max-idle",   5);
-        int keepAlive = Config.getInt("app.http.pool.keep-alive", 300);
-        maxIdle   = (maxIdle   <= 0) ? 5   : maxIdle;
-        keepAlive = (keepAlive <= 0) ? 300 : keepAlive;
-        OkHttpClient.Builder builder = HttpUtil.getClientBuilder();
-        builder.connectionPool(new ConnectionPool(maxIdle, keepAlive, TimeUnit.SECONDS));
-        return builder.build();
+        return HttpClientBuilder.buildPooled();
     }
 
 }

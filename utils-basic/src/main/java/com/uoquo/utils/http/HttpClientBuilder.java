@@ -86,7 +86,7 @@ public class HttpClientBuilder {
         }
         
         // 设置 Cookie
-        if (cookies != null && cookies.exist()) {
+        if (cookies != null && !cookies.empty()) {
             builder.cookieJar(createCookieJar(cookies));
         }
         
@@ -106,7 +106,7 @@ public class HttpClientBuilder {
         builder.dns(new UoquoDns());
         
         // 设置连接池
-        int maxIdle = Config.getInt("app.http.pool.max-idle", DEFAULT_MAX_IDLE_CONNECTIONS);
+        int maxIdle   = Config.getInt("app.http.pool.max-idle", DEFAULT_MAX_IDLE_CONNECTIONS);
         int keepAlive = Config.getInt("app.http.pool.keep-alive", DEFAULT_KEEP_ALIVE_DURATION);
         if (maxIdle > 0 && keepAlive > 0) {
             builder.connectionPool(new ConnectionPool(maxIdle, keepAlive, TimeUnit.SECONDS));
@@ -121,13 +121,13 @@ public class HttpClientBuilder {
     private static OkHttpClient.Builder createBaseBuilder() {
         // 读取配置
         int connectTimeout = Config.getInt("app.http.pool.timeout.connect", DEFAULT_CONNECT_TIMEOUT);
-        int readTimeout = Config.getInt("app.http.pool.timeout.read", DEFAULT_READ_TIMEOUT);
-        int writeTimeout = Config.getInt("app.http.pool.timeout.write", DEFAULT_WRITE_TIMEOUT);
+        int readTimeout    = Config.getInt("app.http.pool.timeout.read", DEFAULT_READ_TIMEOUT);
+        int writeTimeout   = Config.getInt("app.http.pool.timeout.write", DEFAULT_WRITE_TIMEOUT);
         
         // 参数校验
         connectTimeout = (connectTimeout <= 0) ? 10 : connectTimeout;
-        readTimeout = (readTimeout <= 0) ? 50 : readTimeout;
-        writeTimeout = (writeTimeout <= 0) ? 50 : writeTimeout;
+        readTimeout    = (readTimeout    <= 0) ? 50 : readTimeout;
+        writeTimeout   = (writeTimeout   <= 0) ? 50 : writeTimeout;
         
         // 创建基础构建器
         OkHttpClient.Builder builder = new OkHttpClient.Builder()

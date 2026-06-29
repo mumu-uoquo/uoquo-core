@@ -71,12 +71,12 @@ public class HttpParams {
      * @param key   请求参数key
      * @param value 请求参数值（String）
      */
-    public void addParam(String key, String value) {
+    public void add(String key, String value) {
         if (key == null) {
             return;
         }
         // 删除原有值
-        removeParam(key);
+        remove(key);
         // 添加新值
         value = (value == null) ? "" : value;
         formParam.put(key, value);
@@ -88,11 +88,11 @@ public class HttpParams {
      * @param key   请求参数key
      * @param value 请求参数值（Number）
      */
-    public void addParam(String key, Number value) {
+    public void add(String key, Number value) {
         if (value == null) {
-            addParam(key, "");
+            add(key, "");
         } else {
-            addParam(key, value.toString());
+            add(key, value.toString());
         }
     }
     
@@ -102,11 +102,11 @@ public class HttpParams {
      * @param key   请求参数key
      * @param value 请求参数值（Date）
      */
-    public void addParam(String key, Date value) {
+    public void add(String key, Date value) {
         if (value == null) {
-            addParam(key, "");
+            add(key, "");
         } else {
-            addParam(key, DateUtil.toString(value, DateUtil.FORMAT_TIMESTAMP));
+            add(key, DateUtil.toString(value, DateUtil.FORMAT_TIMESTAMP));
         }
     }
     
@@ -120,7 +120,7 @@ public class HttpParams {
      * @param key   请求参数key
      * @param value 请求参数值（Date）
      */
-    public void addParam(String key, Map<String, ?> value) {
+    public void add(String key, Map<String, ?> value) {
         formParam.put(key, value);
     }
     
@@ -134,7 +134,7 @@ public class HttpParams {
      * @param key   请求参数key
      * @param value 请求参数值（Date）
      */
-    public void addParam(String key, Collection<?> value) {
+    public void add(String key, Collection<?> value) {
         formParam.put(key, value);
     }
     
@@ -144,7 +144,7 @@ public class HttpParams {
      * @param key   请求参数key
      * @param value 请求参数值（File）
      */
-    public void addParam(String key, File value) {
+    public void add(String key, File value) {
         if ((key == null) || (value == null)) {
             return;
         }
@@ -163,14 +163,14 @@ public class HttpParams {
      * @param key   请求参数key
      * @param value 请求参数值（File list）
      */
-    public void addParam(String key, List<File> value) {
+    public void add(String key, List<File> value) {
         if ((key == null) || (value == null) || (value.isEmpty())) {
             return;
         }
         
         List<File> list = fileParam.get(key);
         if (list == null) {
-            list = new ArrayList<File>();
+            list = new ArrayList<>();
         }
         list.addAll(value);
         fileParam.put(key, list);
@@ -180,12 +180,24 @@ public class HttpParams {
      * 删除请求参数.
      * @param key 请求参数key
      */
-    public void removeParam(String key) {
+    public void remove(String key) {
         if (key == null) {
             return;
         }
         formParam.remove(key);
         fileParam.remove(key);
+    }
+
+    /**
+     * 键值是否存在.
+     * @param key 请求参数key
+     * @return 执行结果（true：存在，false：不存在）
+     */
+    public boolean exist(String key) {
+        if (key == null) {
+            return false;
+        }
+        return formParam.containsKey(key) || fileParam.containsKey(key);
     }
     
     /**
@@ -213,23 +225,11 @@ public class HttpParams {
     }
     
     /**
-     * 是否存在值.
-     * @return true：有，false：无
+     * 表单参数是否为空.
+     * @return true：空，false：非空
      */
-    public boolean existFormParam() {
-        return !formParam.isEmpty();
-    }
-    
-    /**
-     * 键值是否存在.
-     * @param key 请求参数key
-     * @return 执行结果（true：存在，false：不存在）
-     */
-    public boolean existParam(String key) {
-        if (key == null) {
-            return false;
-        }
-        return formParam.containsKey(key) || fileParam.containsKey(key);
+    public boolean emptyFormParam() {
+        return formParam.isEmpty();
     }
     
     /**
@@ -272,7 +272,7 @@ public class HttpParams {
      * @return 编码后的参数
      */
     public String getURLEncodedParams() {
-        if (!existFormParam()) {
+        if (emptyFormParam()) {
             return null;
         }
         StringBuilder sb = new StringBuilder();

@@ -354,7 +354,7 @@ public class HttpUtil {
     public static String json(String url, HttpParams parms, Object json, HttpHeaders headers, HttpCookies cookies) throws Exception {
         // 处理 URL 参数
         String fullUrl = url;
-        if (parms != null && parms.existFormParam()) {
+        if ((parms != null) && !parms.emptyFormParam()) {
             StringBuilder urlBuilder = new StringBuilder(url);
             urlBuilder.append(url.contains("?") ? "&" : "?");
             urlBuilder.append(parms.getURLEncodedParams());
@@ -935,7 +935,7 @@ public class HttpUtil {
         // 设置请求数据
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(url);
-        if ((parms != null) && parms.existFormParam()) {
+        if ((parms != null) && !parms.emptyFormParam()) {
             if (url.indexOf("?") > 0) {
                 urlBuilder.append("&");
             } else {
@@ -1039,7 +1039,7 @@ public class HttpUtil {
     public static void downloadPost(String url, HttpParams parms, HttpHeaders headers, HttpCookies cookies, ProgressDownloadListener progress, OutputStream out) throws Exception {
         Request.Builder request = new Request.Builder();
         // 设置请求数据
-        if ((parms != null) && parms.existFormParam()) {
+        if ((parms != null) && !parms.emptyFormParam()) {
             FormBody.Builder formBody = new FormBody.Builder();
             Map<String, String> params = parms.getFormParams();
             for (String key : params.keySet()) {
@@ -1074,7 +1074,7 @@ public class HttpUtil {
      */
     private static Response execute(OkHttpClient client, Request.Builder request, HttpHeaders headers, @Nullable Callback callback) throws Exception {
         // 添加自定义请求头信息
-        if ((headers != null) && headers.exist()) {
+        if ((headers != null) && !headers.empty()) {
             try {
                 for (String key : headers.get().keySet()) {
                     String val = headers.get(key);

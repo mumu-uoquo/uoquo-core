@@ -140,15 +140,7 @@ public class HttpHeaders {
             return value;
         }
     }
-    
-    /**
-     * 是否存在值.
-     * @return true：有，false：无
-     */
-    public boolean exist() {
-        return !param.isEmpty();
-    }
-    
+
     /**
      * 键值是否存在.
      * @param key 请求参数key
@@ -159,6 +151,14 @@ public class HttpHeaders {
             return false;
         }
         return param.containsKey(key);
+    }
+    
+    /**
+     * 是否空.
+     * @return true：空，false：非空
+     */
+    public boolean empty() {
+        return param.isEmpty();
     }
     
 }
