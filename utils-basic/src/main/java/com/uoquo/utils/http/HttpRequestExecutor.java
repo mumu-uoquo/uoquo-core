@@ -47,36 +47,14 @@ public class HttpRequestExecutor {
      */
     public static Response execute(Request.Builder requestBuilder, HttpHeaders headers, 
                                  HttpCookies cookies, Callback callback) throws IOException {
-        // 添加请求头
-        addHeaders(requestBuilder, headers);
-        
-        // 构建请求
-        Request request = requestBuilder.build();
-        
-        // 记录请求日志
-        logRequest(request);
-        
-        // 获取客户端
-        OkHttpClient client = getClient(cookies);
-        
-        try {
-            Call call = client.newCall(request);
-            if (callback != null) {
-                call.enqueue(callback);
-                return null;
-            } else {
-                Response response = call.execute();
-                
-                // 记录响应日志
-                logResponse(response, false);
-                
-                return response;
-            }
-        } catch (Exception e) {
-            // 记录请求错误日志
-            logRequestError(request, e);
-            throw e;
+        Response response = doExecute(requestBuilder, headers, cookies, callback);
+        // 记录日志
+        long contentLength = response.body() != null ? response.body().contentLength() : 0;
+        if (contentLength < 0) {
+            contentLength = 0;
         }
+        logResponse(response, "[response stream]", contentLength);
+        return response;
     }
     
     /**
@@ -84,34 +62,49 @@ public class HttpRequestExecutor {
      */
     public static String executeForString(Request.Builder requestBuilder, HttpHeaders headers, 
                                          HttpCookies cookies) throws IOException {
-        Response response = execute(requestBuilder, headers, cookies);
-        return parseResponseToString(response, false);
+        Response response = doExecute(requestBuilder, headers, cookies, null);
+        // 在 parseResponseToString 中记录日志
+        return parseResponseToString(response);
     }
     
     /**
      * 执行下载请求（不记录响应体）
      */
-    public static Response executeForDownload(Request.Builder requestBuilder, HttpHeaders headers, 
+    public static Response executeForDownload(Request.Builder requestBuilder, HttpHeaders headers,
                                             HttpCookies cookies) throws IOException {
+        Response response = doExecute(requestBuilder, headers, cookies, null);
+        // 记录日志
+        long contentLength = response.body() != null ? response.body().contentLength() : 0;
+        if (contentLength < 0) {
+            contentLength = 0;
+        }
+        logResponse(response, "[download stream]", contentLength);
+
+        return response;
+    }
+
+    private static Response doExecute(Request.Builder requestBuilder, HttpHeaders headers,
+                                    HttpCookies cookies, Callback callback) throws IOException {
         // 添加请求头
         addHeaders(requestBuilder, headers);
-        
+
         // 构建请求
         Request request = requestBuilder.build();
-        
+
         // 记录请求日志
         logRequest(request);
-        
+
         // 获取客户端
         OkHttpClient client = getClient(cookies);
-        
+
         try {
-            Response response = client.newCall(request).execute();
-            
-            // 记录下载响应日志（只记录响应头）
-            logResponse(response, true);
-            
-            return response;
+            Call call = client.newCall(request);
+            if (callback != null) {
+                call.enqueue(callback);
+                return null;
+            } else {
+                return call.execute();
+            }
         } catch (Exception e) {
             // 记录请求错误日志
             logRequestError(request, e);
@@ -257,37 +250,23 @@ public class HttpRequestExecutor {
     /**
      * 解析响应为字符串（带日志）
      */
-    public static String parseResponseToString(Response response, boolean isDownload) throws IOException {
+    private static String parseResponseToString(Response response) throws IOException {
         if (response == null) {
             return null;
         }
         
         try (response) {
             ResponseBody body = response.body();
-            
-            if (!isDownload) {
-                // 记录响应体日志（非下载请求）
-                if (log.isInfoEnabled() && body != null) {
-                    String content = body.string();
-                    if (StringUtil.notNull(content)) {
-                        String truncatedBody = content;
-                        if (truncatedBody.length() > 2000) {
-                            truncatedBody = truncatedBody.substring(0, 2000) + "...";
-                        }
-                        log.info("HTTP Response Body: {}", truncatedBody);
-                        return content;
-                    }
-                } else if (body != null) {
-                    return body.string();
-                }
-            } else {
-                // 下载请求，直接读取内容
-                if (body != null) {
-                    return body.string();
-                }
+
+            // 记录响应体日志（非下载请求）
+            if (body != null) {
+                String content = body.string();
+                logResponse(response, content, body.contentLength());
+                return content;
             }
             
             if (response.code() == 200) {
+                logResponse(response, "", 0);
                 return null;
             }
             throw new IOException(String.valueOf(response.code()));
@@ -305,36 +284,52 @@ public class HttpRequestExecutor {
         if (!log.isInfoEnabled()) {
             return;
         }
-        
+
         try {
-            Map<String, List<String>> headerMap = request.headers().toMultimap();
+            StringBuilder sb = new StringBuilder();
+            // 请求方法
+            String method = request.method();
             String uri = truncateString(request.url().toString(), 500);
-            RequestBody body = request.body();
-            
-            if (body == null) {
-                log.info("HTTP Request: uri={}, method={}, headers={}", 
-                        uri, request.method(), headerMap);
-            } else if (isFileUpload(body)) {
-                log.info("HTTP Request: uri={}, method={}, headers={}, body=[multipart/form-data file upload]", 
-                        uri, request.method(), headerMap);
-            } else if (isStreamUpload(body)) {
-                log.info("HTTP Request: uri={}, method={}, headers={}, body=[stream upload]", 
-                        uri, request.method(), headerMap);
-            } else if (body instanceof FormBody formBody) {
-                List<Map<String, String>> params = extractFormParams(formBody);
-                log.info("HTTP Request: uri={}, method={}, headers={}, params={}", 
-                        uri, request.method(), headerMap, params);
-            } else if (Objects.equals(body.contentType(), MEDIA_JSON)) {
-                String bodyStr = truncateString(body.toString(), 1000);
-                log.info("HTTP Request: uri={}, method={}, headers={}, body={}", 
-                        uri, request.method(), headerMap, bodyStr);
-            } else if (body.contentLength() == 0) {
-                log.info("HTTP Request: uri={}, method={}, headers={}, body=[empty]", 
-                        uri, request.method(), headerMap);
-            } else {
-                log.info("HTTP Request: uri={}, method={}, headers={}, body=[type: {}]", 
-                        uri, request.method(), headerMap, body.contentType());
+            sb.append("\n---> ").append(method).append(" ").append(uri).append(" HTTP/1.1");
+
+            // 请求头
+            Map<String, List<String>> headerMap = request.headers().toMultimap();
+            for (Map.Entry<String, List<String>> entry : headerMap.entrySet()) {
+                for (String value : entry.getValue()) {
+                    sb.append("\n").append(entry.getKey()).append(": ").append(value);
+                }
             }
+            // 请求体
+            RequestBody body = request.body();
+            String bodyStr = null;
+            long contentLength = 0;
+
+            if (body != null) {
+                contentLength = body.contentLength();
+                if (isFileUpload(body)) {
+                    bodyStr = "[multipart/form-data file upload]";
+                } else if (isStreamUpload(body)) {
+                    bodyStr = "[stream upload]";
+                } else if (body instanceof FormBody formBody) {
+                    List<Map<String, String>> params = extractFormParams(formBody);
+                    bodyStr = params.toString();
+                } else if (body.contentLength() == 0) {
+                    // 空请求体，不显示内容
+                } else {
+                    bodyStr = truncateString(body.toString(), 1000);
+                }
+            }
+
+            if (bodyStr != null && !bodyStr.isEmpty()) {
+                sb.append("\n\n").append(bodyStr);
+            }
+
+            if (contentLength < 0) {
+                contentLength = 0;
+            }
+            sb.append("\n---> END HTTP (").append(contentLength).append("-byte body)");
+
+            log.info(sb.toString());
         } catch (Exception e) {
             // 记录日志时发生异常不影响主流程
             log.debug("Failed to log request: {}", e.getMessage());
@@ -344,24 +339,30 @@ public class HttpRequestExecutor {
     /**
      * 记录响应日志
      */
-    private static void logResponse(Response response, boolean isDownload) {
+    private static void logResponse(Response response, String content, long contentLength) {
         if (!log.isInfoEnabled()) {
             return;
         }
-        
+
         try {
-            Map<String, List<String>> headerMap = response.headers().toMultimap();
+            StringBuilder sb = new StringBuilder();
+            // 响应码及耗时
             int statusCode = response.code();
-            String message = response.message();
-            
-            if (isDownload) {
-                long contentLength = response.body() != null ? response.body().contentLength() : 0;
-                log.info("HTTP Download Response: status={}, message={}, content-length={}, headers={}, body=[download stream]", 
-                        statusCode, message, contentLength, headerMap);
-            } else {
-                log.info("HTTP Response: status={}, message={}, headers={}", 
-                        statusCode, message, headerMap);
+            long duration = response.receivedResponseAtMillis() - response.sentRequestAtMillis();
+            sb.append("\n<--- HTTP/1.1 ").append(statusCode).append(" (").append(duration).append("ms)");
+            // 响应头
+            Map<String, List<String>> headerMap = response.headers().toMultimap();
+            for (Map.Entry<String, List<String>> entry : headerMap.entrySet()) {
+                for (String value : entry.getValue()) {
+                    sb.append("\n").append(entry.getKey()).append(": ").append(value);
+                }
             }
+            // 响应体
+            String bodyStr = truncateString(content, 1000);
+            sb.append("\n\n").append(bodyStr);
+            sb.append("\n<--- END HTTP (").append(contentLength).append("-byte body)");
+
+            log.info(sb.toString());
         } catch (Exception e) {
             // 记录日志时发生异常不影响主流程
             log.debug("Failed to log response: {}", e.getMessage());
@@ -372,25 +373,44 @@ public class HttpRequestExecutor {
      * 记录请求错误日志
      */
     private static void logRequestError(Request request, Exception e) {
-        if (log.isWarnEnabled()) {
-            Map<String, List<String>> headerMap = request.headers().toMultimap();
+        if (!log.isWarnEnabled()) {
+            return;
+        }
+
+        try {
+            StringBuilder sb = new StringBuilder();
+            String method = request.method();
             String uri = truncateString(request.url().toString(), 500);
-            RequestBody body = request.body();
-            
-            if (body == null) {
-                log.warn("HTTP Request Error: uri={}, method={}, headers={}", 
-                        uri, request.method(), headerMap, e);
-            } else if (body instanceof FormBody formBody) {
-                List<Map<String, String>> params = extractFormParams(formBody);
-                log.warn("HTTP Request Error: uri={}, method={}, headers={}, params={}", 
-                        uri, request.method(), headerMap, params, e);
-            } else if (Objects.equals(body.contentType(), MEDIA_JSON)) {
-                log.warn("HTTP Request Error: uri={}, method={}, headers={}, body={}", 
-                        uri, request.method(), headerMap, body.toString(), e);
-            } else {
-                log.warn("HTTP Request Error: uri={}, method={}, headers={}", 
-                        uri, request.method(), headerMap, e);
+            sb.append("\n---> ").append(method).append(" ").append(uri).append(" HTTP/1.1");
+
+            // headers
+            Map<String, List<String>> headerMap = request.headers().toMultimap();
+            for (Map.Entry<String, List<String>> entry : headerMap.entrySet()) {
+                for (String value : entry.getValue()) {
+                    sb.append("\n").append(entry.getKey()).append(": ").append(value);
+                }
             }
+
+            RequestBody body = request.body();
+            String bodyStr = null;
+            if (body != null) {
+                if (body instanceof FormBody formBody) {
+                    List<Map<String, String>> params = extractFormParams(formBody);
+                    bodyStr = params.toString();
+                } else if (Objects.equals(body.contentType(), MEDIA_JSON)) {
+                    bodyStr = body.toString();
+                }
+            }
+
+            if (bodyStr != null && !bodyStr.isEmpty()) {
+                sb.append("\n\n").append(bodyStr);
+            }
+
+            sb.append("\n---> END HTTP (").append(e.getMessage()).append(")");
+            log.warn(sb.toString(), e);
+        } catch (Exception ex) {
+            // 记录日志时发生异常不影响主流程
+            log.debug("Failed to log request error: {}", ex.getMessage());
         }
     }
     
@@ -519,6 +539,8 @@ public class HttpRequestExecutor {
         if (str == null || str.length() <= maxLength) {
             return str;
         }
-        return str.substring(0, maxLength) + "...";
+        // 主要用于日志记录，便于后续问题分析，所以不做截断处理
+        return str;
+        //return str.substring(0, maxLength) + "...";
     }
 }
