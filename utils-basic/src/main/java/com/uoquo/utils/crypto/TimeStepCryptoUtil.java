@@ -58,7 +58,20 @@ public class TimeStepCryptoUtil {
      * @return 加密结果；失败时返回原值
      */
     public static String encryptTAES(String value) {
-        return encryptTimeStep(value, false);
+        long stepMs = getTimeStepMs();
+        return encryptTimeStep(value, stepMs, false);
+    }
+
+    /**
+     * 时间片加密 - TAES
+     *
+     * @param value 待加密明文
+     * @param second 时间片长度（秒）
+     * @return 加密结果；失败时返回原值
+     */
+    public static String encryptTAES(String value, int second) {
+        long stepMs = second * 1000L;
+        return encryptTimeStep(value, stepMs, false);
     }
 
     /**
@@ -68,7 +81,20 @@ public class TimeStepCryptoUtil {
      * @return 加密结果；失败时返回原值
      */
     public static String encryptTSM4(String value) {
-        return encryptTimeStep(value, true);
+        long stepMs = getTimeStepMs();
+        return encryptTimeStep(value, stepMs, true);
+    }
+
+    /**
+     * 时间片加密 - TSM4
+     *
+     * @param value 待加密明文
+     * @param second 时间片长度（秒）
+     * @return 加密结果；失败时返回原值
+     */
+    public static String encryptTSM4(String value, int second) {
+        long stepMs = second * 1000L;
+        return encryptTimeStep(value, stepMs, true);
     }
 
     /**
@@ -78,7 +104,20 @@ public class TimeStepCryptoUtil {
      * @return 解密结果；失败时返回原值
      */
     public static String decryptTAES(String value) {
-        return decryptTimeStep(value, false);
+        long stepMs = getTimeStepMs();
+        return decryptTimeStep(value, stepMs, false);
+    }
+
+    /**
+     * 时间片解密 - TAES
+     *
+     * @param value 待解密密文
+     * @param second 时间片长度（秒）
+     * @return 解密结果；失败时返回原值
+     */
+    public static String decryptTAES(String value, int second) {
+        long stepMs = second * 1000L;
+        return decryptTimeStep(value, stepMs, false);
     }
 
     /**
@@ -88,7 +127,20 @@ public class TimeStepCryptoUtil {
      * @return 解密结果；失败时返回原值
      */
     public static String decryptTSM4(String value) {
-        return decryptTimeStep(value, true);
+        long stepMs = getTimeStepMs();
+        return decryptTimeStep(value, stepMs, true);
+    }
+
+    /**
+     * 时间片解密 - TSM4
+     *
+     * @param value 待解密密文
+     * @param second 时间片长度（秒）
+     * @return 解密结果；失败时返回原值
+     */
+    public static String decryptTSM4(String value, int second) {
+        long stepMs = second * 1000L;
+        return decryptTimeStep(value, stepMs, true);
     }
 
     // ====================================================================
@@ -98,16 +150,17 @@ public class TimeStepCryptoUtil {
     /**
      * 时间片加密核心方法
      *
-     * @param value 待加密明文
-     * @param sm4   true 使用 SM4，false 使用 AES
+     * @param value  待加密明文
+     * @param stepMs 时间片长度（毫秒）
+     * @param sm4    true 使用 SM4，false 使用 AES
      * @return 加密结果或原值
      */
-    private static String encryptTimeStep(String value, boolean sm4) {
+    private static String encryptTimeStep(String value, long stepMs, boolean sm4) {
         if (StringUtil.isNull(value)) {
             return value;
         }
         try {
-            String key = generateCurrentTimeStepKey();
+            String key = generateCurrentTimeStepKey(stepMs);
             return sm4 ? SM4.encrypt(value, key) : AES.encrypt(value, key);
         } catch (Exception e) {
             log.warn("{} 时间片加密失败：{}", sm4 ? "TSM4" : "TAES", e.getMessage());
@@ -118,16 +171,17 @@ public class TimeStepCryptoUtil {
     /**
      * 时间片解密核心方法
      *
-     * @param value 密文（hex 编码）
-     * @param sm4   true 使用 SM4，false 使用 AES
+     * @param value  密文（hex 编码）
+     * @param stepMs 时间片长度（毫秒）
+     * @param sm4    true 使用 SM4，false 使用 AES
      * @return 解密结果或原值
      */
-    private static String decryptTimeStep(String value, boolean sm4) {
+    private static String decryptTimeStep(String value, long stepMs, boolean sm4) {
         if (StringUtil.isNull(value)) {
             return value;
         }
         
-        long currentStep = System.currentTimeMillis() / getTimeStepMs();
+        long currentStep = System.currentTimeMillis() / stepMs;
         Exception lastError = null;
         
         // 尝试当前时间片和上一时间片，覆盖跨片网络传输场景
@@ -139,11 +193,8 @@ public class TimeStepCryptoUtil {
                 lastError = e;
             }
         }
-        
-        if (lastError != null) {
-            log.warn("{} 时间片解密失败（已尝试当前/上一时间片）：{}",
-                    sm4 ? "TSM4" : "TAES", lastError.getMessage());
-        }
+
+        log.warn("{} 时间片解密失败（已尝试当前/上一时间片）：{}", sm4 ? "TSM4" : "TAES", lastError.getMessage());
         return value;
     }
 
@@ -156,8 +207,8 @@ public class TimeStepCryptoUtil {
      *
      * @return 16 字符的时间片密钥
      */
-    public static String generateCurrentTimeStepKey() {
-        long step = System.currentTimeMillis() / getTimeStepMs();
+    private static String generateCurrentTimeStepKey(long stepMs) {
+        long step = System.currentTimeMillis() / stepMs;
         return generateTimeStepKey(step);
     }
 
