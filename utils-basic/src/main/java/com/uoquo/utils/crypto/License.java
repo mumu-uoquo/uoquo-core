@@ -398,22 +398,22 @@ public class License {
     private static void verifyMachineInfo(LicenseInfo licenseInfo) {
         LicenseInfo current = buildCurrentMachineInfo();
 
-        // ---- 校验 appName ----
-        String licensedName = licenseInfo.getAppName() == null ? "" : licenseInfo.getAppName().trim();
-        String currentName  = current.getAppName()     == null ? "" : current.getAppName().trim();
-        if (!currentName.equals(licensedName)) {
-            log.error("verifyMachineInfo: appName mismatch, licensed=[{}], current=[{}]", licensedName, currentName);
-            throw new IllegalStateException("授权校验失败：应用名称不匹配，请重新申请授权。");
-        }
-
-        // ---- 校验 appPort ----
-        String licensedPort = licenseInfo.getAppPort() == null ? "" : licenseInfo.getAppPort().trim();
-        String currentPort  = current.getAppPort()     == null ? "" : current.getAppPort().trim();
-        boolean portEmpty = StringUtil.isNull(licensedPort) && StringUtil.isNull(currentPort);
-        if (!portEmpty && !currentPort.equals(licensedPort)) {
-            log.error("verifyMachineInfo: appPort mismatch, licensed=[{}], current=[{}]", licensedPort, currentPort);
-            throw new IllegalStateException("授权校验失败：应用端口不匹配，请重新申请授权。");
-        }
+//        // ---- 校验 appName ----
+//        String licensedName = licenseInfo.getAppName() == null ? "" : licenseInfo.getAppName().trim();
+//        String currentName  = current.getAppName()     == null ? "" : current.getAppName().trim();
+//        if (!currentName.equals(licensedName)) {
+//            log.error("verifyMachineInfo: appName mismatch, licensed=[{}], current=[{}]", licensedName, currentName);
+//            throw new IllegalStateException("授权校验失败：应用名称不匹配，请重新申请授权。");
+//        }
+//
+//        // ---- 校验 appPort ----
+//        String licensedPort = licenseInfo.getAppPort() == null ? "" : licenseInfo.getAppPort().trim();
+//        String currentPort  = current.getAppPort()     == null ? "" : current.getAppPort().trim();
+//        boolean portEmpty = StringUtil.isNull(licensedPort) && StringUtil.isNull(currentPort);
+//        if (!portEmpty && !currentPort.equals(licensedPort)) {
+//            log.error("verifyMachineInfo: appPort mismatch, licensed=[{}], current=[{}]", licensedPort, currentPort);
+//            throw new IllegalStateException("授权校验失败：应用端口不匹配，请重新申请授权。");
+//        }
 
         // ---- 校验 machineCode ----
         String licensedCode = licenseInfo.getMachineCode() == null ? "" : licenseInfo.getMachineCode().trim();
@@ -427,7 +427,7 @@ public class License {
             throw new IllegalStateException("授权校验失败：机器码不匹配，请重新申请授权。");
         }
 
-        log.debug("verifyMachineInfo: passed. name=[{}], port=[{}], macs=[{}]", currentName, currentPort, currentCode);
+        log.debug("verifyMachineInfo: passed. name=[{}], port=[{}], macs=[{}]", current.getAppName(), current.getAppPort(), currentCode);
 
         // ---- 校验过期时间（为 null 表示永久有效）----
         Integer expiryDate = licenseInfo.getExpiryDate();
