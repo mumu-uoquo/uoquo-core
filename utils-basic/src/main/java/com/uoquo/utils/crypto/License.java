@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -131,8 +130,8 @@ public class License {
         /** 时间戳（生成机器信息时的系统时间，毫秒）. */
         private Long timestamp;
 
-        /** 过期时间戳（毫秒，由授权方设置；为 null 时表示永久有效）. */
-        private Long expiryDate;
+        /** 过期日期（格式 yyyyMMdd，如 20251231；由授权方设置；为 null 时表示永久有效）. */
+        private Integer expiryDate;
 
         public String getMachineCode()               { return machineCode;     }
         public void   setMachineCode(String v)       { machineCode = v;        }
@@ -152,8 +151,8 @@ public class License {
         public Long   getTimestamp()                 { return timestamp;       }
         public void   setTimestamp(Long v)           { timestamp = v;          }
 
-        public Long   getExpiryDate()                { return expiryDate;      }
-        public void   setExpiryDate(Long v)          { expiryDate = v;         }
+        public Integer getExpiryDate()               { return expiryDate;      }
+        public void   setExpiryDate(Integer v)        { expiryDate = v;         }
     }
 
     // -------------------------------------------------------------------------
@@ -431,17 +430,13 @@ public class License {
         log.debug("verifyMachineInfo: passed. name=[{}], port=[{}], macs=[{}]", currentName, currentPort, currentCode);
 
         // ---- 校验过期时间（为 null 表示永久有效）----
-        Long expiryDate = licenseInfo.getExpiryDate();
+        Integer expiryDate = licenseInfo.getExpiryDate();
         if (expiryDate != null) {
-            // 取当天 0 点时间戳，只要授权日期 >= 今天 0 点，当天 24 点前均有效
-            Calendar cal = Calendar.getInstance();
-            cal.set(Calendar.HOUR_OF_DAY, 0);
-            cal.set(Calendar.MINUTE,      0);
-            cal.set(Calendar.SECOND,      0);
-            cal.set(Calendar.MILLISECOND, 0);
-            long todayStart = cal.getTimeInMillis();
-            if (expiryDate < todayStart) {
-                log.error("verifyMachineInfo: license expired, expiryDate=[{}], todayStart=[{}]", expiryDate, todayStart);
+            // 将当前日期格式化为 yyyyMMdd 整数后直接比较，语义清晰且无时区偏差
+            java.time.LocalDate today = java.time.LocalDate.now();
+            int todayInt = today.getYear() * 10000 + today.getMonthValue() * 100 + today.getDayOfMonth();
+            if (expiryDate < todayInt) {
+                log.error("verifyMachineInfo: license expired, expiryDate=[{}], today=[{}]", expiryDate, todayInt);
                 throw new IllegalStateException("授权校验失败：授权已过期，请联系程序提供商重新授权。");
             }
         }
