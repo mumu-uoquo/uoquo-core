@@ -271,7 +271,7 @@ public class License {
 
     /**
      * 从授权文件加载、解密并校验授权内容，返回 {@link LicenseInfo} 对象.
-     * <p>等同于 {@link #loadLicense(Class) loadLicense(LicenseInfo.class)}。</p>
+     * <p>等同于 {@link #load(Class) load(LicenseInfo.class)}。</p>
      *
      * @return 公钥解密并校验通过的 {@link LicenseInfo} 对象
      * @throws IllegalStateException 当授权文件不存在、内容为空或机器信息不匹配时抛出
@@ -297,7 +297,7 @@ public class License {
      * @throws IllegalStateException    当授权文件不存在、内容为空或机器信息不匹配时抛出
      * @throws RuntimeException         当 RSA 解密或 JSON 反序列化失败时抛出
      */
-    public static <T extends LicenseInfo> T loadLicense(Class<T> clazz) {
+    public static <T extends LicenseInfo> T load(Class<T> clazz) {
         if (clazz == null) {
             throw new IllegalArgumentException("clazz 不能为 null");
         }
