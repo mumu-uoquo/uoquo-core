@@ -123,7 +123,9 @@ public class GlobalInterceptor implements HandlerInterceptor {
         } else {
             // 如果是参数解析错误（或者spring抛出的其他错误）将由 DefaultHandlerExceptionResolver 解析，此时ex为空
             Throwable error = (Throwable) request.getAttribute(DefaultErrorAttributes.class.getName() + ".ERROR");
-            if ((error != null) || (HttpServletResponse.SC_OK != response.getStatus())) {
+            // 只有 4xx（客户端错误）和 5xx（服务端错误）才算错误；
+            // 2xx（如 200/201/204/206 断点续传）和 3xx（如 301/302/304 协商缓存）均属正常响应。
+            if ((error != null) || (response.getStatus() >= HttpServletResponse.SC_BAD_REQUEST)) {
                 saveAccessLog(request, "ERROR", error);
             } else {
                 saveAccessLog(request, "SUCCESS", null);
