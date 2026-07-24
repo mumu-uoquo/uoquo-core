@@ -77,9 +77,9 @@ public class Convert2TS implements ConvertInterface {
             // 组装头
             sb.append("import type { AxiosRequestConfig } from \"axios\";").append(NEW_LINE);
             if (MODEL_UOQU.equals(model)) {
-                sb.append("import { http } from \"@/utils/http\";").append(NEW_LINE);
+                sb.append("import { http } from \"@/api/http\";").append(NEW_LINE);
             } else if (MODEL_PURE.equals(model)) {
-                sb.append("import { http } from \"@/utils/http\";").append(NEW_LINE);
+                sb.append("import { http } from \"@/api/http\";").append(NEW_LINE);
             } else {
                 sb.append("import request from \"@/utils/request\";").append(NEW_LINE);
             }

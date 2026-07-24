@@ -31,6 +31,7 @@ public class ConvertOpenAPI {
         // health
         convert.parseFile("D:/temp/health/platform/" + model, "/health/api/platform", "https://api.uoquo.com/health/api/platform/v3/api-docs/AdminApi");
         convert.parseFile("D:/temp/health/platform/" + model, "/health/api/platform", "https://api.uoquo.com/health/api/platform/v3/api-docs/RestfulApi");
+        convert.parseFile("D:/temp/health/platform/" + model, "/health/api/platform", "https://api.uoquo.com/health/api/operate/v3/api-docs/RestfulApi");
 //        // bimi
 //        convert.parseFile("D:/temp/platform", "/api/platform", "https://bimi.uoquo.com/api/platform/v3/api-docs/AdminApi");
 //        convert.parseFile("D:/temp/platform", "/api/platform", "https://bimi.uoquo.com/api/platform/v3/api-docs/RestfulApi");
