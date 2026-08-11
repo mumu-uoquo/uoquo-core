@@ -67,6 +67,9 @@ public class GlobalInterceptor implements HandlerInterceptor {
      */
     public final static String REQUEST_EXECUTE_TIME = "REQUEST_EXECUTE_TIME";
 
+    // 增加递归保护（兜底）
+    private static final ThreadLocal<Boolean> IS_LOGGING = ThreadLocal.withInitial(() -> false);
+
     /**
      * Controller方法处理之前
      */
@@ -144,72 +147,85 @@ public class GlobalInterceptor implements HandlerInterceptor {
      * 记录日志（含执行耗时、用户信息、简单入参等）
      */
     private void saveAccessLog(HttpServletRequest request, String status, Throwable ex) {
-        // 1. 计算执行耗时
-        double sec = 0;
-        Long bgn = (Long) request.getAttribute(REQUEST_EXECUTE_TIME);
-        if (bgn != null) {
-            sec = (System.currentTimeMillis() - bgn) / 1000d;
+        // 【新增】递归保护
+        if (IS_LOGGING.get()) {
+            log.warn("检测到 saveAccessLog 递归调用，跳过日志记录，status={}", status);
+            return;
         }
-        // 2. 请求参数处理
-        //String path  = request.getRequestURI().substring(request.getContextPath().length());
-        String path    = request.getRequestURI();
-        String pattern = (String)request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-        String clientIp  = StringUtil.isNull(CurrentUser.getClientIp()) ? WebUtil.getClientIp(request) : CurrentUser.getClientIp();
-        // 第三方直接调用时userId为空，此时也应该记录相关日志
-        CurrentUser.UserInfo user = CurrentUser.getInfo();
-        String userInfo  = JsonUtil.serialize(user);
-        // 2.1 请求头
-        Map<String, String> headers = new HashMap<>();
-        Enumeration<String> headerNames = request.getHeaderNames();
-        while (headerNames.hasMoreElements()) {
-            String key = headerNames.nextElement();
-            if ("user-agent".equalsIgnoreCase(key)) {
-                continue;
+        IS_LOGGING.set(true);
+
+        try {
+            // 1. 计算执行耗时
+            double sec = 0;
+            Long bgn = (Long) request.getAttribute(REQUEST_EXECUTE_TIME);
+            if (bgn != null) {
+                sec = (System.currentTimeMillis() - bgn) / 1000d;
             }
-            String value = request.getHeader(key);
-            headers.put(key, value);
-        }
-        // 2.2 请求参数
-        Map<String, Object> params = WebUtil.getRequestParams(request);
-        // 2.3 请求体（非上传文件的请求体）
-        String body = null;
-        String contentType = request.getHeader("Content-Type");
-        contentType = (contentType == null) ? "" : contentType.toLowerCase();
-        if (request instanceof RepeatedlyHttpServletRequestWrapper) {
-            body = WebUtil.getRequestBody(request);
-        } else {
-            body = "Cannot read body for [" + contentType + "]";
-        }
-        // 3. 记录日志
-        // INFO只记录1000字符以内的数据（减少日志量）
-        if ((body != null) && (body.length() > 1000)) {
-            body = body.substring(0, 1000) + "...";
-        }
-        // 3.1 错误日志始终记录（此处仅简单记录，详细信息由错误统一处理的地方记录）
-        if ("ERROR".equals(status)) {
-            log.error("request [{}] [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={}, error={} .",
-                    CurrentUser.getNonce(), status, request.getMethod(), path, contentType, String.format("%.3f", sec),
-                    serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, body,
-                    (ex == null) ? null : ex.getMessage());
-            return;
-        }
-        // 3.2 SSE/WebSocket 长连接不记录慢请求（连接持续时间不代表处理耗时）
-        if (WebUtil.isLongLivedRequest(request)) {
-            return;
-        }
-        // 3.3 正常信息按级别记录
-        if (sec >= 1) {
-            log.warn("request [{}] [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
-                    CurrentUser.getNonce(), status, request.getMethod(), path, contentType, String.format("%.3f", sec),
-                    serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, body);
-        } else if (log.isDebugEnabled()) {
-            log.debug("request [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, header={}, params={}, body={} .",
-                    CurrentUser.getNonce(), status, request.getMethod(), path, String.format("%.3f", sec),
-                    serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, JsonUtil.serialize(headers), params, body);
-        } else if (log.isInfoEnabled()) {
-            log.info("request [{}] [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
-                    CurrentUser.getNonce(), status, request.getMethod(), path, contentType, String.format("%.3f", sec),
-                    serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, body);
+            // 2. 请求参数处理
+            //String path  = request.getRequestURI().substring(request.getContextPath().length());
+            String path    = request.getRequestURI();
+            String pattern = (String)request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+            String clientIp  = StringUtil.isNull(CurrentUser.getClientIp()) ? WebUtil.getClientIp(request) : CurrentUser.getClientIp();
+            // 第三方直接调用时userId为空，此时也应该记录相关日志
+            CurrentUser.UserInfo user = CurrentUser.getInfo();
+            String userInfo  = JsonUtil.serialize(user);
+            // 2.1 请求头
+            Map<String, String> headers = new HashMap<>();
+            Enumeration<String> headerNames = request.getHeaderNames();
+            while (headerNames.hasMoreElements()) {
+                String key = headerNames.nextElement();
+                if ("user-agent".equalsIgnoreCase(key)) {
+                    continue;
+                }
+                String value = request.getHeader(key);
+                headers.put(key, value);
+            }
+            // 2.2 请求参数
+            Map<String, Object> params = WebUtil.getRequestParams(request);
+            // 2.3 请求体（非上传文件的请求体）
+            String body = null;
+            String contentType = request.getHeader("Content-Type");
+            contentType = (contentType == null) ? "" : contentType.toLowerCase();
+            if (request instanceof RepeatedlyHttpServletRequestWrapper) {
+                body = WebUtil.getRequestBody(request);
+            } else {
+                body = "Cannot read body for [" + contentType + "]";
+            }
+            // 3. 记录日志
+            // INFO只记录1000字符以内的数据（减少日志量）
+            if ((body != null) && (body.length() > 1000)) {
+                body = body.substring(0, 1000) + "...";
+            }
+            // 3.1 错误日志始终记录（此处仅简单记录，详细信息由错误统一处理的地方记录）
+            if ("ERROR".equals(status)) {
+                log.error("request [{}] [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={}, error={} .",
+                        CurrentUser.getNonce(), status, request.getMethod(), path, contentType, String.format("%.3f", sec),
+                        serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, body,
+                        (ex == null) ? null : ex.getMessage());
+                return;
+            }
+            // 3.2 SSE/WebSocket 长连接不记录慢请求（连接持续时间不代表处理耗时）
+            if (WebUtil.isLongLivedRequest(request)) {
+                return;
+            }
+            // 3.3 正常信息按级别记录
+            if (sec >= 1) {
+                log.warn("request [{}] [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
+                        CurrentUser.getNonce(), status, request.getMethod(), path, contentType, String.format("%.3f", sec),
+                        serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, body);
+            } else if (log.isDebugEnabled()) {
+                log.debug("request [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, header={}, params={}, body={} .",
+                        CurrentUser.getNonce(), status, request.getMethod(), path, String.format("%.3f", sec),
+                        serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, JsonUtil.serialize(headers), params, body);
+            } else if (log.isInfoEnabled()) {
+                log.info("request [{}] [{}] [{}] [{}] [{}] [{}s]. server={}:{}, pattern={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
+                        CurrentUser.getNonce(), status, request.getMethod(), path, contentType, String.format("%.3f", sec),
+                        serverIp, serverPort, pattern, CurrentUser.getAppkey(), clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, body);
+            }
+        } catch (StackOverflowError e) {
+            log.error("发生栈溢出，强制终止日志记录", e);
+        } finally {
+            IS_LOGGING.remove();
         }
     }
 

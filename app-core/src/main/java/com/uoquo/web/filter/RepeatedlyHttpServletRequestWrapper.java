@@ -8,11 +8,7 @@ package com.uoquo.web.filter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.zip.GZIPInputStream;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
@@ -46,41 +42,57 @@ public class RepeatedlyHttpServletRequestWrapper extends HttpServletRequestWrapp
     }
 
     @Override
+    public BufferedReader getReader() throws IOException {
+        return new BufferedReader(new InputStreamReader(this.getInputStream()));
+    }
+
+    @Override
     public ServletInputStream getInputStream() throws IOException {
         // 无请求流，返回空
         if (cachedBytes == null) {
             cacheInputStream();
         }
+        // 【新增】缓存失败时返回空流，避免后续 NPE
+        if (cachedBytes == null) {
+            return new CachedServletInputStream(new byte[0]);
+        }
         // 有请求流时，重新包装
         return new CachedServletInputStream();
-    }
-
-    @Override
-    public BufferedReader getReader() throws IOException {
-        return new BufferedReader(new InputStreamReader(this.getInputStream()));
     }
     
     /**
      * 缓存请求流.
      */
     private void cacheInputStream() throws IOException {
+        /* Cache the inputstream in order to read it multiple times. For
+         * convenience, I use apache.commons IOUtils
+         */
         cachedBytes = new ByteArrayOutputStream();
         // 字节复制
         byte[] bytes = new byte[1024 * 10];
         int n;
-        while ((n = super.getInputStream().read(bytes)) != -1) {
-            cachedBytes.write(bytes, 0, n);
+        try {
+            InputStream originalStream = super.getInputStream();
+            while ((n = originalStream.read(bytes)) != -1) {
+                cachedBytes.write(bytes, 0, n);
+            }
+        } catch (IOException e) {
+            // 【关键修复】原始流不可读时，标记缓存为空并安全退出
+            log.warn("读取原始请求流失败，请求体缓存不可用: {}", e.getMessage());
+            cachedBytes = null;  // 置空，防止后续再次进入 cacheInputStream
+            return;  // 直接返回，不执行后续逻辑
         }
-        // 如果是gzip压缩传输的数据，先解压再缓存
-        HttpServletRequest request = (HttpServletRequest)super.getRequest();
+
+        // gzip解压逻辑（仅在成功读取后执行）
+        HttpServletRequest request = (HttpServletRequest) super.getRequest();
         String contentEncoding = request.getHeader("Content-Encoding");
-        if ((contentEncoding != null) && contentEncoding.contains("gzip")) {
+        if ("gzip".equalsIgnoreCase(contentEncoding)) {
             try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(cachedBytes.toByteArray()))) {
                 bytes = gis.readAllBytes();
                 cachedBytes.reset();
                 cachedBytes.writeBytes(bytes);
             } catch (Exception e) {
-                log.warn("解压请求参数失败.", e);
+                log.warn("请求体解压失败.", e);
             }
         }
     }
@@ -93,6 +105,11 @@ public class RepeatedlyHttpServletRequestWrapper extends HttpServletRequestWrapp
         public CachedServletInputStream() {
             /* create a new input stream from the cached request body */
             input = new ByteArrayInputStream(cachedBytes.toByteArray());
+        }
+
+        // 【新增】支持空缓存的构造方法
+        public CachedServletInputStream(byte[] empty) {
+            input = new ByteArrayInputStream(empty);
         }
 
         @Override
