@@ -5,22 +5,17 @@
 
 package com.uoquo.web.controller;
 
-import com.uoquo.utils.DateUtil;
 import com.uoquo.utils.StringUtil;
-import com.uoquo.utils.json.JsonUtil;
-import com.uoquo.utils.CurrentUser;
 import com.uoquo.web.ReturnData;
 import com.uoquo.web.exception.*;
-import com.uoquo.web.utils.WebUtil;
+import com.uoquo.web.utils.GlobalExceptionUtil;
 
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
-import java.util.TreeMap;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.ConstraintViolationException;
 
 import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
@@ -37,24 +32,29 @@ import org.springframework.boot.web.servlet.error.ErrorAttributes;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.jspecify.annotations.NonNull;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.context.request.ServletWebRequest;
-import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.ModelAndView;
 
 /**
- * 描述：全局异常处理（请求转发）.<br>
+ * 描述：全局异常处理（Servlet/容器兜底层，基于 /error 错误页转发）.<br>
  * 说明：响应码为 200，方便前端统一处理
  * <pre>
- * 优点：能捕获 404、过滤器、拦截器、控制器、参数绑定等错误.
+ * 捕获范围：
+ *     1. 404（无匹配的handler时，Spring Boot 默认不会抛出异常，只能由 ErrorController 处理）；
+ *     2. 过滤器（Filter）、Servlet 容器等发生在 DispatcherServlet 之前的异常；
+ *     3. 拦截器、控制器、参数绑定等异常未被 GlobalExceptionResolver 消费时的最后兜底.
+ * 优点：能覆盖 MVC 异常处理（GlobalExceptionResolver）够不到的所有场景，是全局异常的最后一道防线.
  * 缺点：
- *     1. 因为是请求转发，所以无法拿到请求的入参信息
+ *     1. 兜底场景的请求上下文不完整：错误转发（FORWARD）不会再执行 REQUEST 型过滤器，
+ *        且 /error 已被排除在拦截器之外（见 WebHttpConfig#excludePaths），
+ *        因此 404 等场景下取不到 CurrentUser 等上下文，请求体的读取结果也不可靠（此处不读取请求体）.
  *     2. 除 404 外，其他异常都会触发 “ContainerBase.[Tomcat]” 的错误输出，导致日志记录双份.
- * 用法：作为全局异常处理的补偿机制，配合 GlobalExceptionResolver 或 GlobalExceptionHandler
+ *     3. 响应已提交后再转发会失败，此类场景无法输出统一响应.
+ * 结论：本类不应作为全局异常的唯一实现，只适合作为补偿（兜底）机制.
+ * 用法：与 GlobalExceptionResolver 配合使用，二者是“主处理 + 兜底”的协作关系，不是二选一
  * 资料：https://blog.csdn.net/weixin_36380516/article/details/132506064
  * </pre>
  * 参考：{@link org.springframework.boot.autoconfigure.web.servlet.error.BasicErrorController}的处理<br>
@@ -64,9 +64,10 @@ import org.springframework.web.servlet.ModelAndView;
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
  * 1.0          2018-03-20     xuhz.           创建
+ * 1.1          2026-09-03     uoquo team      修正类注释；公共逻辑抽取到 GlobalExceptionUtil
  * </pre>
  * @since   JDK 1.8
- * @version 1.0
+ * @version 1.1
  * @author  uoquo team
  */
 @Hidden
@@ -105,99 +106,34 @@ public class GlobalExceptionController extends AbstractErrorController {
 
     /**
      * 返回JSON错误信息.<br>
-     * @param request 请求对象
+     * @param request  请求对象
+     * @param response 响应对象
      */
     @RequestMapping
     @ResponseStatus(HttpStatus.OK)
     public ReturnData<String> error(HttpServletRequest request, HttpServletResponse response) {
-        // 拼装堆栈内容前缀
-        CurrentUser.UserInfo user = CurrentUser.getInfo();
+        // 0. 获取错误信息
         Map<String, Object> body = this.getErrorAttributes(request, getErrorAttributeOptions(request, MediaType.ALL));
         Integer status = (Integer) body.get("status");
         String from = (String) body.get("path");
         String mesg = (String) body.get("message");
         Date   time = (Date) body.get("timestamp");
-        String clientIp = StringUtil.isNull(CurrentUser.getClientIp()) ? WebUtil.getClientIp(request) : CurrentUser.getClientIp();
-        String pattern  = (String)request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-        String requestNonce = CurrentUser.getNonce();
-        // 第三方直接调用时userId为空，此时也应该记录相关日志
-        String userInfo = JsonUtil.serialize(user);
-        // 请求参数及请求体
-        TreeMap<String, Object> params = WebUtil.getRequestParams(request);
-        // TODO 由于是转发请求，需想办法拿到请求体数据
-        String reqBody = null;
-
-        // 获取真正的错误信息
+        // 获取真正的错误对象
         Throwable error = this.getError(request, status, mesg);
-        AbstractBaseException ex;
-        if (error instanceof RemoteServiceException    // 其他服务抛出的异常
-                || error instanceof ForbiddenException // 无权操作的异常
-        ) {
-            // 此时需要记录异常的堆栈详情
-            ex = (AbstractBaseException) error;
-            log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .\n{}",
-                    requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
-                    clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, ex.getTrace());
-        } else if (error instanceof AbstractBaseException) {
-            // 如果是自定义其他异常，不记录详细的异常信息
-            ex = (AbstractBaseException) error;
-            if (log.isDebugEnabled()) {
-                log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .\n{}",
-                        requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
-                        clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, ex.getTrace());
-            } else {
-                log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
-                        requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
-                        clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody);
-            }
-        } else if (error instanceof MethodArgumentNotValidException argsError) {
-            // JSON入参校验失败（暂时只拿第一个校验出错的属性）
-            //List<FieldError> listError = argsError.getBindingResult().getFieldErrors();
-            FieldError fieldError = argsError.getBindingResult().getFieldError();
-            if (fieldError == null) {
-                ex = new ParamErrorException(argsError);
-            } else {
-                ex = new ParamErrorException(String.format("[%s]%s", fieldError.getField(), fieldError.getDefaultMessage()));
-            }
-            log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
-                    requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
-                    clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, error);
-        } else if (error instanceof ConstraintViolationException) {
-            // FORM入参校验失败
-            // TODO 后续是否可以拿到具体的字段
-            ex = new ParamErrorException(error);
-            log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .",
-                    requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
-                    clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, error);
-        } else {
-            // 如果是其他异常，转换为自定义异常，并记录详细堆栈信息
-            if (StringUtil.isNull(mesg)) {
-                mesg = error.getMessage();
-            }
-            ex = new SystemErrorException(mesg, error);
-            log.error("request [{}] [ERROR] [{}] [{}] [0s]. server={}:{}, pattern={}, code=[{}], message={}, appkey={}, client_ip={}, device={}, token={}, user={}, params={}, body={} .\n{}",
-                    requestNonce, request.getMethod(), from, serverIp, serverPort, pattern, ex.getCode(), ex.getMesg(), CurrentUser.getAppkey(),
-                    clientIp, CurrentUser.getDeviceId(), CurrentUser.getToken(), userInfo, params, reqBody, ex.getTrace());
-        }
-        // 3. 响应输出
-        if (log.isDebugEnabled()) {
-            log.error("request[{}] error trace: ", requestNonce, ex);
-        }
-        // 拼装堆栈内容前缀
-        ex.setTraceId(CurrentUser.getTraceId());
-        String activeType = System.getProperty("spring.profiles.active");
-        if (!"prod".equalsIgnoreCase(activeType)) {
-            StringBuilder tracePrefix = new StringBuilder();
-            tracePrefix.append("timestamp: ").append(DateUtil.toString(time, DateUtil.FORMAT_TIMESTAMP)).append("\n");
-            tracePrefix.append("server: ").append(String.format("%s:%s", serverIp, serverPort)).append("\n");
-            tracePrefix.append("client: ").append(clientIp).append("\n");
-            tracePrefix.append("from: ").append(from).append("\n");
-            tracePrefix.append("traceId: ").append(CurrentUser.getTraceId()).append("\n");
-            ex.setTrace(tracePrefix.toString());
-        }
+        // 1. 采集上下文（请求参数、请求体、用户信息等）
+        // 兜底场景的请求上下文不完整，请求体的读取结果不可靠（详见类注释），此处不读取请求体
+        GlobalExceptionUtil.Context ctx = GlobalExceptionUtil.buildContext(request, from, time, null, mesg)
+                .withServer(serverIp, serverPort);
+        // 2. 格式化错误信息及日志记录
+        AbstractBaseException ex = GlobalExceptionUtil.resolveAndLog(log, ctx, error, GlobalExceptionUtil.DetailRule.FALLBACK);
+        // 3. 补齐链路信息（traceId、堆栈前缀）
+        GlobalExceptionUtil.attachTrace(ctx, ex);
         // 增加错误码到响应头，主要用于响应内容为文件流的接口
-        response.setHeader("response-code", ex.getStatus());
-        return  new ReturnData<>(ex);
+        if (response != null) {
+            response.setHeader("response-code", ex.getStatus());
+        }
+        // 4. 返回异常内容
+        return new ReturnData<>(ex);
     }
 
     private Throwable getError(@NonNull HttpServletRequest request, Integer status, String mesg) {

@@ -25,9 +25,9 @@ com.uoquo.web
 │
 ├── controller/
 │   ├── AppVersionController.java        # 应用版本号接口
-│   ├── GlobalExceptionController.java   # 404 等未捕获异常处理
-│   ├── GlobalExceptionHandler.java      # @ControllerAdvice 异常处理
-│   └── GlobalExceptionResolver.java     # HandlerExceptionResolver 实现
+│   ├── GlobalExceptionController.java   # 全局异常兜底（/error：404、过滤器等）
+│   ├── GlobalExceptionHandler.java      # 备用实现（@RestControllerAdvice，未启用）
+│   └── GlobalExceptionResolver.java     # 全局异常主处理（HandlerExceptionResolver）
 │
 ├── events/
 │   ├── AppEvent.java                    # 应用事件（含业务元数据）
@@ -79,7 +79,8 @@ com.uoquo.web
 │       └── TableAliasDeParser.java      # 表别名解析
 │
 └── utils/
-    └── WebUtil.java                     # Web 工具（签名计算、IP 获取等）
+    ├── WebUtil.java                     # Web 工具（签名计算、IP 获取等）
+    └── GlobalExceptionUtil.java         # 全局异常处理公共逻辑（上下文、日志、响应）
 ```
 
 ---
@@ -117,8 +118,16 @@ HTTP 请求
     │
     ▼
 ┌─────────────────────────────────────┐
-│ Exception Handler                    │
-│  GlobalExceptionHandler              │
+│ Exception Handler（主处理）          │
+│  GlobalExceptionResolver            │
+│  → 拦截器/控制器/参数绑定异常        │
+│  → 在原调用栈内处理，可取到请求体    │
+└─────────────────────────────────────┘
+    │
+    ▼  未覆盖的异常（404、Filter、容器）
+┌─────────────────────────────────────┐
+│ Error Controller（兜底）             │
+│  GlobalExceptionController（/error） │
 │  → 所有异常统一返回 ReturnData       │
 │  → HTTP 状态码始终 200               │
 └─────────────────────────────────────┘
@@ -262,13 +271,27 @@ public void onUserCreated(AppEvent event) {
 
 ## 统一异常处理
 
-三层保障机制：
+采用“主处理 + 兜底”两层结构（两者必须同时存在，不是三选一、也不是三层叠加）：
 
-1. **`GlobalExceptionHandler`**（@ControllerAdvice）— 捕获 Controller 层异常
-2. **`GlobalExceptionController`**（ErrorController）— 捕获 404 等 Servlet 异常
-3. **`GlobalExceptionResolver`**（HandlerExceptionResolver）— 兜底处理
+| 处理类 | 处理层次 | 捕获范围 | 当前状态 |
+|--------|----------|----------|----------|
+| `GlobalExceptionResolver` | DispatcherServlet 内（主处理） | 拦截器（preHandle）、控制器、参数绑定 | 启用（`@Bean` 注册于 `WebHttpConfig`） |
+| `GlobalExceptionController` | Servlet 容器 `/error`（兜底） | 404、过滤器、Servlet 容器等 MVC 之外的异常 | 启用 |
+| `GlobalExceptionHandler` | DispatcherServlet 内（备用） | 同 `GlobalExceptionResolver` | 未启用（`@RestControllerAdvice` 已注释） |
 
-所有异常统一包装为 `ReturnData`，生产环境只返回 traceId 不返回堆栈。
+说明：
+
+1. `GlobalExceptionResolver` 与 `GlobalExceptionHandler` 属于**同一处理层次**，功能重叠，**二选一、不能同时启用**
+   （Resolver 的 order 为最高优先级且会无条件处理异常，即便启用 Handler 也不会被执行）；
+2. `GlobalExceptionController` 是**兜底**而非主实现：错误转发（FORWARD）不会再执行 REQUEST 型过滤器，
+   且 `/error` 已被排除在拦截器之外，因此兜底场景下请求上下文不完整、请求体读取不可靠，
+   并且容器会额外输出一次错误日志（日志双份）；
+3. 404、Filter 等异常永远到不了 MVC 的异常解析器，只能由 `/error` 兜底，因此 `GlobalExceptionController` 不可省略。
+
+三者重复的公共逻辑（上下文采集、异常规整、日志记录、响应输出）统一收敛在 `GlobalExceptionUtil` 中。
+
+所有异常统一包装为 `ReturnData`，HTTP 状态码始终为 200，业务错误码同时写入响应头 `response-code`；
+生产环境只返回 traceId，不返回堆栈。
 
 ---
 
