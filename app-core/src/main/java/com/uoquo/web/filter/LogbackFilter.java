@@ -20,6 +20,8 @@ import java.io.IOException;
 /**
  * 描述：添加日志MDC信息. <br>
  * 背景：便于在日志中打印请求ID，用于区分同一次请求. <br>
+ * 说明：清理动作必须放在 finally 中——servlet 容器的线程是池化复用的，
+ *      若请求处理抛出异常而未清理，MDC 中的 requestId 会被下一个复用该线程的请求继承（日志串号）.<br>
  * <pre>
  *   WebFilter 是 Java Servlet 规范的一部分，由 Servlet 容器（如 Tomcat）直接管理
  *   Servlet 容器不识别 Spring 的 Order 注解，因为它属于 Spring 框架
@@ -50,8 +52,12 @@ public class LogbackFilter implements Filter, Ordered {
         }
         MDC.put("requestId", rid);
         log.debug("----------------------->LogbackFilter do. rid={}", rid);
-        chain.doFilter(request, response);
-        MDC.remove("requestId");
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            // 必须清理：线程由容器池化复用，不清理会导致下一个请求沿用上一个请求的 requestId
+            MDC.remove("requestId");
+        }
     }
     
     @Override

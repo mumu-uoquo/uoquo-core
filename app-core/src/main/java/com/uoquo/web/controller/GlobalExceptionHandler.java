@@ -118,7 +118,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         GlobalExceptionUtil.Context ctx = GlobalExceptionUtil.buildContext(request, request.getRequestURI(), new Date(), GlobalExceptionUtil.readRequestBody(request))
                 .withServer(serverIp, serverPort);
         // 2. 格式化错误信息及日志记录
-        AbstractBaseException ex = GlobalExceptionUtil.resolveAndLog(log, ctx, error, GlobalExceptionUtil.DetailRule.MVC);
+        AbstractBaseException ex = GlobalExceptionUtil.resolveAndLog(log, ctx, error, GlobalExceptionUtil.DetailRule.PRIMARY);
         // 3. 补齐链路信息（traceId、堆栈前缀）
         GlobalExceptionUtil.attachTrace(ctx, ex);
         return ex;

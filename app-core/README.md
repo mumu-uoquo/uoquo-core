@@ -38,8 +38,9 @@ com.uoquo.web
 │   └── UoquoEventPublisher.java         # 事件发布器
 │
 ├── filter/
-│   ├── ContentCachingWrapperFilter.java        # 请求体缓存包装
-│   ├── LogbackFilter.java                      # 日志 MDC（请求 TraceId）
+│   ├── ContentCachingWrapperFilter.java         # 请求体/响应体缓存包装
+│   ├── GlobalExceptionFilter.java               # 全局异常兜底（Filter 层）
+│   ├── LogbackFilter.java                       # 日志 MDC（请求 TraceId）
 │   └── RepeatedlyHttpServletRequestWrapper.java # 可重复读取请求体
 │
 ├── interceptor/
@@ -93,8 +94,10 @@ HTTP 请求
     ▼
 ┌─────────────────────────────────────┐
 │ Filter 层                            │
-│  LogbackFilter → 生成 TraceId        │
-│  ContentCachingWrapperFilter → 缓存请求体 │
+│  1. LogbackFilter → 生成 TraceId     │
+│  2. GlobalExceptionFilter → 异常兜底 │
+│  3. ContentCachingWrapperFilter      │
+│     → 缓存请求体/响应体              │
 └─────────────────────────────────────┘
     │
     ▼
@@ -275,18 +278,22 @@ public void onUserCreated(AppEvent event) {
 
 | 处理类 | 处理层次 | 捕获范围 | 当前状态 |
 |--------|----------|----------|----------|
-| `GlobalExceptionResolver` | DispatcherServlet 内（主处理） | 拦截器（preHandle）、控制器、参数绑定 | 启用（`@Bean` 注册于 `WebHttpConfig`） |
-| `GlobalExceptionController` | Servlet 容器 `/error`（兜底） | 404、过滤器、Servlet 容器等 MVC 之外的异常 | 启用 |
+| `GlobalExceptionResolver` | DispatcherServlet 内（主处理） | 拦截器（preHandle/postHandle）、控制器、参数绑定 | 启用（`@Bean` 注册于 `WebHttpConfig`） |
+| `GlobalExceptionFilter` | Filter 链最外层（主处理） | 过滤器等发生在 DispatcherServlet 之外的异常 | 启用（order = `HIGHEST_PRECEDENCE + 10`） |
+| `GlobalExceptionController` | Servlet 容器 `/error`（兜底） | 404 等未落入上述两者的异常 | 启用 |
 | `GlobalExceptionHandler` | DispatcherServlet 内（备用） | 同 `GlobalExceptionResolver` | 未启用（`@RestControllerAdvice` 已注释） |
 
 说明：
 
-1. `GlobalExceptionResolver` 与 `GlobalExceptionHandler` 属于**同一处理层次**，功能重叠，**二选一、不能同时启用**
+1. 四者按请求阶段**纵向分层、短路处理**：谁先拦到谁处理并输出响应，同一异常不会被记录两次；
+2. `GlobalExceptionResolver` 与 `GlobalExceptionHandler` 属于**同一处理层次**，功能重叠，**二选一、不能同时启用**
    （Resolver 的 order 为最高优先级且会无条件处理异常，即便启用 Handler 也不会被执行）；
-2. `GlobalExceptionController` 是**兜底**而非主实现：错误转发（FORWARD）不会再执行 REQUEST 型过滤器，
-   且 `/error` 已被排除在拦截器之外，因此兜底场景下请求上下文不完整、请求体读取不可靠，
-   并且容器会额外输出一次错误日志（日志双份）；
-3. 404、Filter 等异常永远到不了 MVC 的异常解析器，只能由 `/error` 兜底，因此 `GlobalExceptionController` 不可省略。
+3. `GlobalExceptionFilter` 在 Filter 链最外层兜底，异常不再冒泡到 Servlet 容器，
+   可避免 Tomcat `ContainerBase.[Tomcat]` 与应用日志重复输出的问题；
+   响应已提交（文件流、SSE 输出中途失败）时无法介入，只记录日志并原样抛出，由容器日志保留最后线索；
+4. `GlobalExceptionController` 兜底 404（不是异常，Filter 与 Resolver 均无从介入）
+   以及上述处理者都未覆盖的场景；错误转发（FORWARD）不会再执行 REQUEST 型过滤器，
+   且 `/error` 已被排除在拦截器之外，因此兜底场景下请求上下文不完整、请求体读取不可靠。
 
 三者重复的公共逻辑（上下文采集、异常规整、日志记录、响应输出）统一收敛在 `GlobalExceptionUtil` 中。
 

@@ -77,7 +77,10 @@ public class ContentCachingWrapperFilter extends OncePerRequestFilter implements
             // 由于spring优先处理过，此处不需要过滤文件上传的请求（type.contains("multipart/form-data")
             chain.doFilter(request, responseWrapper);
         } else {
-            RepeatedlyHttpServletRequestWrapper repeatedlyRequest = new RepeatedlyHttpServletRequestWrapper(request);
+            // 最外层（GlobalExceptionFilter）已包装过请求流时直接复用，避免重复缓存请求体
+            RepeatedlyHttpServletRequestWrapper repeatedlyRequest = (request instanceof RepeatedlyHttpServletRequestWrapper)
+                    ? (RepeatedlyHttpServletRequestWrapper) request
+                    : new RepeatedlyHttpServletRequestWrapper(request);
             chain.doFilter(repeatedlyRequest, responseWrapper);
         }
         // 4. 更新响应（不操作这一步，会导致接口响应空白）

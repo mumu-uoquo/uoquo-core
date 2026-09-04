@@ -36,8 +36,9 @@ import java.util.TreeMap;
 
 /**
  * 描述：全局异常处理的公共逻辑（上下文采集、异常规整、日志记录、响应输出）.<br>
- * 背景：GlobalExceptionController（/error 兜底）、GlobalExceptionResolver（MVC 内主处理）、
- * GlobalExceptionHandler（备用实现）三处存在大量相同的处理逻辑，统一收敛到本类，避免多处维护.<br>
+ * 背景：GlobalExceptionResolver（MVC 内主处理）、GlobalExceptionFilter（Filter 层兜底）、
+ * GlobalExceptionController（/error 兜底）、GlobalExceptionHandler（备用实现）四处存在大量相同的处理逻辑，
+ * 统一收敛到本类，避免多处维护.<br>
  * 说明：本类只提供静态方法，不参与 Spring 的 Bean 生命周期.<br>
  * 日期：2026-09-03 10:00 <br>
  * 变更：
@@ -72,10 +73,10 @@ public final class GlobalExceptionUtil {
      */
     public enum DetailRule {
         /**
-         * MVC 内主处理（GlobalExceptionResolver、GlobalExceptionHandler）：<br>
+         * 主处理（GlobalExceptionResolver、GlobalExceptionHandler、GlobalExceptionFilter）：<br>
          * RemoteServiceException、SystemErrorException 记录堆栈详情.
          */
-        MVC(true, false),
+        PRIMARY(true, false),
         /**
          * /error 兜底处理（GlobalExceptionController）：<br>
          * RemoteServiceException、ForbiddenException 记录堆栈详情.
