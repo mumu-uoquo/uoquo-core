@@ -13,6 +13,9 @@ import java.io.*;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.Map.Entry;
@@ -49,7 +52,7 @@ public class CompressUtil {
             return false;
         }
         final byte[] header = new byte[10];
-        try (FileInputStream fis = new FileInputStream(file)) {
+        try (InputStream fis = Files.newInputStream(file.toPath())) {
             if (fis.read(header) != header.length) {
                 return false;
             }
@@ -146,8 +149,8 @@ public class CompressUtil {
             srcFile = files.getFirst();
         }
         // 单文件压缩
-        try (FileInputStream  fis = new FileInputStream(srcFile);
-             FileOutputStream fos = new FileOutputStream(gzFile);){
+        try (InputStream  fis = Files.newInputStream(srcFile.toPath());
+             OutputStream fos = Files.newOutputStream(gzFile.toPath());){
             gzip(fis, fos);
         }
         // 如果是先打的tar包，则压缩后将其删除
@@ -192,8 +195,8 @@ public class CompressUtil {
             throw new IllegalArgumentException(String.format("待压缩文件[%s]不是文件或者目录，请核对后再处理.", dir.getAbsolutePath()));
         }
         // 单文件压缩
-        try (FileInputStream  fis = new FileInputStream(srcFile);
-             FileOutputStream fos = new FileOutputStream(gzFile);){
+        try (InputStream  fis = Files.newInputStream(srcFile.toPath());
+             OutputStream fos = Files.newOutputStream(gzFile.toPath());){
             gzip(fis, fos);
         }
         // 如果是先打的tar包，则压缩后将其删除
@@ -284,8 +287,8 @@ public class CompressUtil {
         String unPath = target.getAbsolutePath() + File.separator;
         target = new File(unPath + gzName + ".tmp");
         try (
-                FileInputStream fis = new FileInputStream(gzFile);
-                BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(target), BUF_SIZE);
+                InputStream fis = Files.newInputStream(gzFile.toPath());
+                BufferedOutputStream bos = new BufferedOutputStream(Files.newOutputStream(target.toPath()), BUF_SIZE);
         ) {
             GZIPInputStream gzip = new GZIPInputStream(fis);
             byte[] buffer = new byte[BUF_SIZE];
@@ -314,7 +317,7 @@ public class CompressUtil {
         }
         // http://en.wikipedia.org/wiki/Tar_(computing)#File_header
         final byte[] header = new byte[512];
-        try (FileInputStream fis = new FileInputStream(file)) {
+        try (InputStream fis = Files.newInputStream(file.toPath())) {
             if (fis.read(header) != header.length) {
                 return false;
             }
@@ -359,7 +362,7 @@ public class CompressUtil {
         }
         // 文件压缩
         try (TarArchiveOutputStream tarOut =
-                     new TarArchiveOutputStream(new BufferedOutputStream(new FileOutputStream(tar)))) {
+                     new TarArchiveOutputStream(new BufferedOutputStream(Files.newOutputStream(tar.toPath())))) {
             tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             for (File file : files) {
                 if (file.isDirectory()) {
@@ -395,7 +398,7 @@ public class CompressUtil {
             tar(tar, dir); // 如果是文件，则按文件的方式压缩
         } else if (dir.isDirectory()) {
             try (TarArchiveOutputStream tarOut =
-                         new TarArchiveOutputStream(new BufferedOutputStream(new FileOutputStream(tar)))) {
+                         new TarArchiveOutputStream(new BufferedOutputStream(Files.newOutputStream(tar.toPath())))) {
                 tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
                 // 递归添加文件夹内容
                 final String parentPath = dir.getAbsolutePath();
@@ -460,7 +463,7 @@ public class CompressUtil {
         final TarArchiveEntry tarEntry = new TarArchiveEntry(file, name);
         //tarEntry.setModTime(modTime);
         tarOut.putArchiveEntry(tarEntry);
-        try (InputStream in = new BufferedInputStream(new FileInputStream(file))) {
+        try (InputStream in = new BufferedInputStream(Files.newInputStream(file.toPath()))) {
             final byte[] buf = new byte[BUF_SIZE];
             int len = -1;
             while ((len = in.read(buf)) != -1) {
@@ -479,51 +482,45 @@ public class CompressUtil {
         // 源文件处理
         if (tarFile == null) {
             throw new IllegalArgumentException("必须传入待解压资源");
-        } else if (!tarFile.exists()) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不存在", tarFile.getAbsolutePath()));
-        } else if (!tarFile.isFile()) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不是一个有效的文件", tarFile.getAbsolutePath()));
-        } else if (!tarFile.canRead()) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不可读", tarFile.getAbsolutePath()));
-        } else if (tarFile.length() <= 0) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]内容为空", tarFile.getAbsolutePath()));
-        } else if (!isTar(tarFile)) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不是有效的tar文件", tarFile.getAbsolutePath()));
         }
-        // 目标路径处理
+        Path archive = tarFile.toPath();
+        if (!Files.exists(archive)) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不存在", archive.toAbsolutePath()));
+        } else if (!Files.isRegularFile(archive)) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不是一个有效的文件", archive.toAbsolutePath()));
+        } else if (!Files.isReadable(archive)) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不可读", archive.toAbsolutePath()));
+        } else if (Files.size(archive) <= 0) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]内容为空", archive.toAbsolutePath()));
+        } else if (!isTar(tarFile)) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不是有效的tar文件", archive.toAbsolutePath()));
+        }
+
         if (target == null) {
             String tarName = tarFile.getName();
             target = new File(tarFile.getParent() + tarName.substring(tarName.indexOf(".")));
         }
-        if (target.exists()) {
-            if (!target.isDirectory()) {
-                throw new IllegalArgumentException(String.format("目标路径[%s]已经存在，且不是文件夹", target.getAbsolutePath()));
-            }
-        } else {
-            target.mkdirs();
+        Path targetRoot = target.toPath().toAbsolutePath().normalize();
+        if (Files.exists(targetRoot) && !Files.isDirectory(targetRoot)) {
+            throw new IllegalArgumentException(String.format("目标路径[%s]已经存在，且不是文件夹", targetRoot));
         }
-        // 解压
-        try(TarArchiveInputStream tarIn = new TarArchiveInputStream(new FileInputStream(tarFile));) {
+        Files.createDirectories(targetRoot);
+
+        try (TarArchiveInputStream tarIn = new TarArchiveInputStream(Files.newInputStream(archive))) {
             byte[] byts = new byte[BUF_SIZE];
-            TarArchiveEntry tarEntry = null;
+            TarArchiveEntry tarEntry;
             while ((tarEntry = tarIn.getNextEntry()) != null) {
-                final File file = new File(target, tarEntry.getName());
-                // 文件夹处理
+                Path output = resolveArchiveEntry(targetRoot, tarEntry.getName());
                 if (tarEntry.isDirectory()) {
-                    if (!file.mkdirs()) {
-                        throw new IOException("Unable to create folder " + file.getAbsolutePath());
-                    }
+                    Files.createDirectories(output);
                     continue;
                 }
-                // 解压文件
-                final File parent = file.getParentFile();
-                if (!parent.exists()) {
-                    if (!parent.mkdirs()) {
-                        throw new IOException("Unable to create folder " + parent.getAbsolutePath());
-                    }
+                Path parent = output.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
                 }
-                try (FileOutputStream fos = new FileOutputStream(file)) {
-                    int len = -1;
+                try (OutputStream fos = Files.newOutputStream(output)) {
+                    int len;
                     while ((len = tarIn.read(byts)) != -1) {
                         fos.write(byts, 0, len);
                     }
@@ -542,7 +539,7 @@ public class CompressUtil {
         }
         // NOTE: little-indian bytes order!
         final byte[] bytes = new byte[4];
-        try (FileInputStream fIn = new FileInputStream(file)) {
+        try (InputStream fIn = Files.newInputStream(file.toPath())) {
             if (fIn.read(bytes) != bytes.length) {
                 return false;
             }
@@ -618,7 +615,7 @@ public class CompressUtil {
         // 压缩
         ZipOutputStream out = null;
         try {
-            out = new ZipOutputStream(new FileOutputStream(zipFile));
+            out = new ZipOutputStream(Files.newOutputStream(zipFile.toPath()));
             out.putNextEntry(new ZipEntry(fileName));
             out.write(data);
         } finally {
@@ -681,7 +678,7 @@ public class CompressUtil {
         ZipOutputStream zipOut = null;
         try {
             HashSet<String> names = new HashSet<>();
-            zipOut = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(zipFile)), Charset.forName("UTF-8"));
+            zipOut = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipFile.toPath())), Charset.forName("UTF-8"));
             for (File file : files) {
                 String base = "";
                 if (StringUtil.notNull(basePath)) {
@@ -724,7 +721,7 @@ public class CompressUtil {
             if (!zipFile.getParentFile().exists()) {
                 zipFile.getParentFile().mkdirs();
             }
-            zipOut = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(zipFile)), Charset.forName("UTF-8"));
+            zipOut = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipFile.toPath())), Charset.forName("UTF-8"));
         }
         // 2. 压缩
         try {
@@ -769,7 +766,7 @@ public class CompressUtil {
         // 压缩文件
         BufferedInputStream buffIn = null;
         try {
-            buffIn = new BufferedInputStream(new FileInputStream(current), BUF_SIZE);
+            buffIn = new BufferedInputStream(Files.newInputStream(current.toPath()), BUF_SIZE);
             zipWrite(buffIn, out);
             out.closeEntry();
         } finally {
@@ -796,67 +793,74 @@ public class CompressUtil {
      * @param target  目标目录（为空，则解压到zip文件所在目录）
      */
     public static void unZip(File zipFile, File target) throws IOException {
-        // 源文件处理
         if (zipFile == null) {
             throw new IllegalArgumentException("必须传入待解压资源");
-        } else if (!zipFile.exists()) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不存在", zipFile.getAbsolutePath()));
-        } else if (!zipFile.isFile()) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不是一个有效的文件", zipFile.getAbsolutePath()));
-        } else if (!zipFile.canRead()) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不可读", zipFile.getAbsolutePath()));
-        } else if (zipFile.length() <= 0) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]内容为空", zipFile.getAbsolutePath()));
+        }
+        Path archive = zipFile.toPath();
+        if (!Files.exists(archive)) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不存在", archive.toAbsolutePath()));
+        } else if (!Files.isRegularFile(archive)) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不是一个有效的文件", archive.toAbsolutePath()));
+        } else if (!Files.isReadable(archive)) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不可读", archive.toAbsolutePath()));
+        } else if (Files.size(archive) <= 0) {
+            throw new IllegalArgumentException(String.format("待解压资源[%s]内容为空", archive.toAbsolutePath()));
         } else if (!isZip(zipFile)) {
-            throw new IllegalArgumentException(String.format("待解压资源[%s]不是有效的zip文件", zipFile.getAbsolutePath()));
+            throw new IllegalArgumentException(String.format("待解压资源[%s]不是有效的zip文件", archive.toAbsolutePath()));
         }
-        // 目标路径处理
-        if (target == null) {
-            target = new File(zipFile.getParent());
+
+        Path targetRoot = target == null
+                ? (archive.toAbsolutePath().getParent() == null ? Path.of(".") : archive.toAbsolutePath().getParent())
+                : target.toPath();
+        targetRoot = targetRoot.toAbsolutePath().normalize();
+        if (Files.exists(targetRoot) && !Files.isDirectory(targetRoot)) {
+            throw new IllegalArgumentException(String.format("目标路径[%s]不是一个有效的目录", targetRoot));
         }
-        if (!target.exists()) {
-            target.mkdirs();
-        } else if (!target.isDirectory()) {
-            throw new IllegalArgumentException(String.format("目标路径[%s]不是一个有效的目录", target.getAbsolutePath()));
-        } else if (!target.canWrite()) {
-            throw new IllegalArgumentException(String.format("目标路径[%s]不可写", target.getAbsolutePath()));
+        Files.createDirectories(targetRoot);
+        if (!Files.isWritable(targetRoot)) {
+            throw new IllegalArgumentException(String.format("目标路径[%s]不可写", targetRoot));
         }
-        // 开始解压
-        ZipFile zip = new ZipFile(zipFile);
-        Enumeration<? extends ZipEntry> et = zip.entries();
-        while (et.hasMoreElements()) {
-            ZipEntry item = et.nextElement();
-            String tempPath = target.getAbsolutePath() + File.separator + item.getName();
-            // 如果是文件夹，则创建对应的文件夹
-            if (item.isDirectory()) {
-                File dir = new File(tempPath);
-                dir.mkdirs();
-                continue;
-            }
-            File temp = new File(tempPath);
-            if (temp.exists()) {
-                if (temp.length() == item.getSize()) {
-                    continue; // 文件已经存在，且大小相等，则跳过
+
+        try (ZipFile zip = new ZipFile(zipFile)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry item = entries.nextElement();
+                Path output = resolveArchiveEntry(targetRoot, item.getName());
+                if (item.isDirectory()) {
+                    Files.createDirectories(output);
+                    continue;
                 }
-            } else if (!temp.getParentFile().exists()) {
-                temp.getParentFile().mkdirs(); // 父级文件夹不存在，则创建文件夹
-            }
-            // 读写文件
-            try (
-                BufferedInputStream  bis = new BufferedInputStream(zip.getInputStream(item));
-                BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(tempPath));
-            ) {
-                byte[] buf = new byte[BUF_SIZE];
-                int ch = -1;
-                while ((ch = bis.read(buf)) != -1) {
-                    bos.write(buf, 0, ch);
+                if (Files.exists(output) && Files.size(output) == item.getSize()) {
+                    continue;
                 }
-                bos.flush();
+                Path parent = output.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                try (InputStream input = new BufferedInputStream(zip.getInputStream(item));
+                     OutputStream outputStream = new BufferedOutputStream(Files.newOutputStream(output))) {
+                    byte[] buf = new byte[BUF_SIZE];
+                    int count;
+                    while ((count = input.read(buf)) != -1) {
+                        outputStream.write(buf, 0, count);
+                    }
+                }
             }
         }
-        zip.close();
     }
     
+    /**
+     * 将归档条目解析到目标目录，并阻止 ../ 或绝对路径逃逸。
+     */
+    private static Path resolveArchiveEntry(Path targetRoot, String entryName) throws IOException {
+        Path root = targetRoot.toAbsolutePath().normalize();
+        Path output = root.resolve(entryName).normalize();
+        if (!output.startsWith(root)) {
+            throw new IOException("非法归档路径：" + entryName);
+        }
+        return output;
+    }
+
     // 关闭输出流
     private static void close(Closeable obj) {
         try {

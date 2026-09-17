@@ -19,8 +19,10 @@ import org.springframework.boot.ApplicationRunner;
 import jakarta.annotation.PreDestroy;
 import javax.management.*;
 
-import java.io.File;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Set;
 
 /**
@@ -56,14 +58,13 @@ public class ServiceApplication implements ApplicationRunner {
      * 备注：启动类的main第一行应该执行该方法
      */
     protected static void init() {
-        // 设置默认日志级别，用于在logback未初始化时的日志输出
+        // 1. 设置默认日志级别，用于在logback未初始化时的日志输出
         if (StringUtil.isNull(System.getProperty("app.log.level"))) {
             System.setProperty("app.log.level", Level.INFO.toString());
         }
-        // 设置“无头”模式，用于在服务端生成验证码等场景（测试是不生效T_T）
+        // 2. 设置“无头”模式，用于在服务端生成验证码等场景（测试时无明显效果T_T）
         System.setProperty("java.awt.headless", "true");
-        // 设置程序根目录
-        System.setProperty("app.path", Config.APP_PATH);
+        // 3. 网络过滤相关信息 
         // 由于HostInfoEnvironmentPostProcessor优先于配置文件，因此需要将网络过滤相关信息放入环境变量中
         // 参见：https://blog.csdn.net/xichenguan/article/details/76636342
         System.setProperty("spring.cloud.inetutils.preferred-networks", Config.getString("app.preferred.networks"));
@@ -72,8 +73,10 @@ public class ServiceApplication implements ApplicationRunner {
         if (StringUtil.isNull(activeType)) {
             System.setProperty("spring.profiles.active", Config.getString("app.type", "prod"));
         }
+        // 4. 设置程序根目录
+        System.setProperty("app.path", Config.APP_PATH);
         /*
-         * WEB临时目录.<br>
+         * 5. 设置WEB临时目录（每次启动时删除已有的临时文件）.<br>
          * 注意：必须配置为绝对目录，否则时间长了之后将会出错.<br>
          * 参考：
          * <ul>
@@ -82,12 +85,15 @@ public class ServiceApplication implements ApplicationRunner {
          *   <li>https://www.cnblogs.com/nuccch/p/11546494.html</li>
          * </ul>
          */
-        File tmpDir = new File(Config.getString("spring.servlet.multipart.location", Config.APP_PATH + "/temp"));
-        if (!tmpDir.exists()) {
-            tmpDir.mkdirs();
+        Path tmpDir = Path.of(Config.getString("spring.servlet.multipart.location", Config.APP_PATH + "/temp"))
+                .toAbsolutePath()
+                .normalize();
+        try {
+            Files.createDirectories(tmpDir);
+        } catch (IOException e) {
+            log.warn("创建 WEB 临时目录失败：[{}]", tmpDir.toString(), e);
         }
-        // TODO 每次启动时删除已有的临时文件
-        System.setProperty("spring.servlet.multipart.location", tmpDir.getAbsolutePath()); // 必须是绝对路径
+        System.setProperty("spring.servlet.multipart.location", tmpDir.toString());
 
         // 非开发模式，需要先进行授权校验
 //        if (!"dev".equals(Config.APP_TYPE)) {

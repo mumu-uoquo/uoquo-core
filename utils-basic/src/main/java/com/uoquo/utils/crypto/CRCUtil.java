@@ -5,9 +5,10 @@
 package com.uoquo.utils.crypto;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.CRC32;
@@ -146,14 +147,21 @@ public class CRCUtil {
      * 计算文件的CRC值（支持任意CRC模式，大文件分块处理不占用内存）
      */
     public static long calculateFileCRC(File file, CRCParams params) throws IOException {
+        return calculateFileCRC(file.toPath(), params);
+    }
+
+    /**
+     * 计算文件的 CRC 值（Path 版本）。
+     */
+    public static long calculateFileCRC(Path path, CRCParams params) throws IOException {
         int[] table = getLookupTable(params);
         long crc = params.init;
         int mask = getMask(params.width);
         
-        try (FileInputStream fis = new FileInputStream(file)) {
+        try (var input = Files.newInputStream(path)) {
             byte[] buffer = new byte[8192];
             int len;
-            while ((len = fis.read(buffer)) != -1) {
+            while ((len = input.read(buffer)) != -1) {
                 for (int i = 0; i < len; i++) {
                     byte b = buffer[i];
                     int currentByte = params.refIn ? reverseByte(b & 0xFF, 8) : (b & 0xFF);

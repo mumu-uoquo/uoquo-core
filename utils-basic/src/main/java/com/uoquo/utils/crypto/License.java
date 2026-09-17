@@ -5,12 +5,10 @@
 
 package com.uoquo.utils.crypto;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Set;
@@ -82,16 +80,18 @@ public class License {
      * 授权文件路径.
      */
     private static final String LICENSE_FILE = Config.APP_PATH + "/config/license.dat";
+    private static final Path LICENSE_PATH = Path.of(LICENSE_FILE);
 
     static {
         synchronized (License.class) {
             log.info("license file path: {}", LICENSE_FILE);
-            File file = new File(LICENSE_FILE);
-            if (!file.exists()) {
-                File parent = file.getParentFile();
-                if (parent != null && !parent.exists()) {
-                    parent.mkdirs();
+            try {
+                Path parent = LICENSE_PATH.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
                 }
+            } catch (IOException e) {
+                throw new ExceptionInInitializerError(e);
             }
         }
     }
@@ -317,14 +317,13 @@ public class License {
      */
     private static <T extends LicenseInfo> T decryptAndVerify(Class<T> clazz) {
         // 1. 读取授权文件
-        File file = new File(LICENSE_FILE);
-        if (!file.exists()) {
+        if (!Files.exists(LICENSE_PATH)) {
             throw new IllegalStateException(
                     String.format("授权文件 [%s] 不存在，请联系程序提供商进行授权。", LICENSE_FILE));
         }
         String encryptedContent;
         try {
-            byte[] bytes = Files.readAllBytes(Paths.get(LICENSE_FILE));
+            byte[] bytes = Files.readAllBytes(LICENSE_PATH);
             encryptedContent = new String(bytes, StandardCharsets.UTF_8).trim();
         } catch (IOException e) {
             log.error("loadLicense: read license file [{}] error: {}", LICENSE_FILE, e.getMessage());
@@ -450,9 +449,8 @@ public class License {
      * @throws RuntimeException 当写文件失败时抛出
      */
     private static void writeToFile(String filePath, String content) {
-        try (FileWriter writer = new FileWriter(filePath)) {
-            writer.write(content);
-            writer.flush();
+        try {
+            Files.writeString(Path.of(filePath), content, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("writeToFile: write to [{}] error: {}", filePath, e.getMessage());
             throw new RuntimeException(

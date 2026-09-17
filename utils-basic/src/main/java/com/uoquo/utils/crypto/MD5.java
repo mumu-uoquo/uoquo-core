@@ -5,15 +5,18 @@
 
 package com.uoquo.utils.crypto;
 
-import com.uoquo.utils.FileUtil;
 import com.uoquo.utils.StringUtil;
 
 import java.io.File;
-import java.io.RandomAccessFile;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 
 import org.slf4j.Logger;
@@ -115,8 +118,7 @@ public class MD5 {
      * @throws IllegalStateException    当 MD5 算法不可用或摘要计算异常时
      */
     public static String encryptFileAll(String filePath) {
-        File file = new File(filePath);
-        return encryptFile(file, null, 1, file.length(), true);
+        return encryptFile(Path.of(filePath), null, 1, Long.MAX_VALUE, true);
     }
     
     /**
@@ -131,7 +133,7 @@ public class MD5 {
      * @throws IllegalStateException    当 MD5 算法不可用或摘要计算异常时
      */
     public static String encryptFile(String filePath, String salt) {
-        return encryptFile(new File(filePath), salt, 1000, 100, false);
+        return encryptFile(Path.of(filePath), salt, 1000, 100, false);
     }
     
     /**
@@ -149,7 +151,7 @@ public class MD5 {
      * @throws IllegalStateException    当 MD5 算法不可用或摘要计算异常时
      */
     public static String encryptFile(String filePath, String salt, int part, long len) {
-        return encryptFile(new File(filePath), salt, part, len, false);
+        return encryptFile(Path.of(filePath), salt, part, len, false);
     }
     
     /**
@@ -167,17 +169,31 @@ public class MD5 {
      * @throws IllegalStateException    当 MD5 算法不可用或摘要计算异常时
      */
     public static String encryptFile(File file, String salt, int part, long len, boolean onlyData) {
+        return encryptFile(file.toPath(), salt, part, len, onlyData);
+    }
+
+    /**
+     * 对文件分段计算 MD5（Path API）.
+     */
+    public static String encryptFile(Path file, String salt, int part, long len, boolean onlyData) {
         // 参数合法化
         part = (part <= 0) ? 1000 : part;
         len  = (len  <= 0) ? 100  : len;
-        if (!file.exists()) {
-            throw new IllegalArgumentException(String.format("[%s]不存在", file.getAbsolutePath()));
-        } else if (!file.isFile()) {
-            throw new IllegalArgumentException(String.format("[%s]不是有效文件，无法计算MD5", file.getAbsolutePath()));
-        } else if (!file.canRead()) {
-            throw new IllegalArgumentException(String.format("[%s]不是可读文件，无法计算MD5", file.getAbsolutePath()));
-        } else if (file.length() == 0) {
-            throw new IllegalArgumentException(String.format("[%s]为空文件，无法计算MD5", file.getAbsolutePath()));
+        long fileLength;
+        if (!Files.exists(file)) {
+            throw new IllegalArgumentException(String.format("[%s]不存在", file.toAbsolutePath()));
+        } else if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException(String.format("[%s]不是有效文件，无法计算MD5", file.toAbsolutePath()));
+        } else if (!Files.isReadable(file)) {
+            throw new IllegalArgumentException(String.format("[%s]不是可读文件，无法计算MD5", file.toAbsolutePath()));
+        }
+        try {
+            fileLength = Files.size(file);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(String.format("[%s]无法读取文件大小", file.toAbsolutePath()), e);
+        }
+        if (fileLength == 0) {
+            throw new IllegalArgumentException(String.format("[%s]为空文件，无法计算MD5", file.toAbsolutePath()));
         }
         // 初始化每组长度
         int capacity = onlyData ? 0 : 8; // 计算文件最终的字节数（初始为文件大小所占字节数）
@@ -185,47 +201,50 @@ public class MD5 {
             capacity += salt.getBytes(StandardCharsets.UTF_8).length;
         }
         // 精度处理！！（注：需要注意小数位，否则无限循环的小数divide会抛异常）
-        BigDecimal fl = BigDecimal.valueOf(file.length());
+        BigDecimal fl = BigDecimal.valueOf(fileLength);
         BigDecimal dv = fl.divide(BigDecimal.valueOf(part), RoundingMode.CEILING);
         int partLen  = (int)Math.ceil(dv.doubleValue()); // 每份的长度（最小为1字节）
         if (partLen <= len) {
             len = partLen; // 每组的字节，按实际数据计算
-            capacity += file.length(); // 读取整个文件计算
-        } else if (len * part >= file.length()) {
-            capacity += file.length(); // 读取整个文件计算
+            capacity += fileLength; // 读取整个文件计算
+        } else if (len * part >= fileLength) {
+            capacity += fileLength; // 读取整个文件计算
         } else {
             capacity += len * part;
         }
         // 将文件长度转为字节数组添加到
         ByteBuffer buffer = ByteBuffer.allocate(capacity);
         if (!onlyData) {
-            buffer.putLong(file.length()); // 加入数据长度
+            buffer.putLong(fileLength); // 加入数据长度
         }
         if (StringUtil.notNull(salt)) {
             buffer.put(salt.getBytes(StandardCharsets.UTF_8)); // 加盐
         }
         // 读取文件（从最后一段往前读取）
-        RandomAccessFile raf = null;
-        try {
-            raf = new RandomAccessFile(file, "r");
-            // TODO 如果文件 < 20M 建议一次读入，否则有性能会降低
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
+            // TODO 如果文件 < 20M 建议一次读入，否则会有性能降低
             for (part--; part >= 0; part--) {
-                long pos  = part * partLen;
-                long temp = file.length() - pos;
+                long pos  = (long) part * partLen;
+                long temp = fileLength - pos;
                 if (temp <= 0) {
                     continue;
                 }
                 temp = Math.min(temp, len);
-                byte[] byts = new byte[(int)temp];
-                raf.seek(pos);
-                raf.read(byts);
-                buffer.put(byts);
+                ByteBuffer partBuffer = ByteBuffer.allocate((int) temp);
+                while (partBuffer.hasRemaining()) {
+                    int read = channel.read(partBuffer, pos + partBuffer.position());
+                    if (read < 0) {
+                        break;
+                    }
+                    if (read == 0) {
+                        break;
+                    }
+                }
+                buffer.put(partBuffer.array(), 0, partBuffer.position());
             }
         } catch (Exception e) {
-            log.error("文件[{}]MD5计算：读取文件出错.", file.getAbsolutePath(), e);
-            throw new IllegalArgumentException(String.format("[%s]计算MD5出错", file.getAbsolutePath()), e);
-        } finally {
-            FileUtil.close(raf);
+            log.error("文件[{}]MD5计算：读取文件出错.", file.toAbsolutePath(), e);
+            throw new IllegalArgumentException(String.format("[%s]计算MD5出错", file.toAbsolutePath()), e);
         }
         // 因为 partLen 做了向上取整，所以可能存在没填充满的情况
         if (buffer.position() != buffer.limit()) {

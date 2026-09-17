@@ -8,10 +8,10 @@ package com.uoquo.utils.http;
 import com.uoquo.utils.DateUtil;
 import com.uoquo.utils.json.JsonUtil;
 
-import java.io.File;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -48,7 +48,7 @@ public class HttpParams {
     /**
      * 文件请求参数.
      */
-    private final Map<String, List<File>> fileParam  = new LinkedHashMap<String, List<File>>();
+    private final Map<String, List<Path>> fileParam  = new LinkedHashMap<String, List<Path>>();
     
     /**
      * 构造函数.
@@ -139,36 +139,34 @@ public class HttpParams {
     }
     
     /**
-     * 增加请求参数. <br>
-     * 注意：将覆盖已有值
+     * 增加 Path 文件请求参数。
      * @param key   请求参数key
-     * @param value 请求参数值（File）
+     * @param value 请求参数值（Path）
      */
-    public void add(String key, File value) {
+    public void add(String key, Path value) {
         if ((key == null) || (value == null)) {
             return;
         }
-        
-        List<File> list = fileParam.get(key);
+
+        List<Path> list = fileParam.get(key);
         if (list == null) {
-            list = new ArrayList<File>();
+            list = new ArrayList<>();
         }
         list.add(value);
         fileParam.put(key, list);
     }
-    
+
     /**
-     * 增加请求参数. <br>
-     * 注意：将覆盖已有值
+     * 增加 Path 文件请求参数列表。
      * @param key   请求参数key
-     * @param value 请求参数值（File list）
+     * @param value 请求参数值（Path list）
      */
-    public void add(String key, List<File> value) {
-        if ((key == null) || (value == null) || (value.isEmpty())) {
+    public void add(String key, List<Path> value) {
+        if ((key == null) || (value == null) || value.isEmpty()) {
             return;
         }
-        
-        List<File> list = fileParam.get(key);
+
+        List<Path> list = fileParam.get(key);
         if (list == null) {
             list = new ArrayList<>();
         }
@@ -217,7 +215,7 @@ public class HttpParams {
      * @param key 请求参数key
      * @return 参数对应的值
      */
-    public List<File> getFileParam(String key) {
+    public List<Path> getFileParam(String key) {
         if (key == null) {
             return null;
         }
@@ -263,7 +261,7 @@ public class HttpParams {
      * 获取文件请求参数列表.
      * @return 请求参数列表
      */
-    public Map<String, List<File>> getFileParams() {
+    public Map<String, List<Path>> getFileParams() {
         return fileParam;
     }
     

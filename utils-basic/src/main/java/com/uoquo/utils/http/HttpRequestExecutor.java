@@ -9,6 +9,7 @@ import com.uoquo.utils.json.JsonUtil;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.*;
 
 import okhttp3.*;
@@ -175,15 +176,16 @@ public class HttpRequestExecutor {
         
         if (params != null) {
             // 添加文件参数
-            Map<String, java.util.List<java.io.File>> fileParams = params.getFileParams();
-            for (Map.Entry<String, java.util.List<java.io.File>> entry : fileParams.entrySet()) {
-                for (java.io.File file : entry.getValue()) {
+            Map<String, java.util.List<Path>> fileParams = params.getFileParams();
+            for (Map.Entry<String, java.util.List<Path>> entry : fileParams.entrySet()) {
+                for (Path file : entry.getValue()) {
+                    String fileName = file.getFileName().toString();
                     bodyBuilder.addFormDataPart(
-                        entry.getKey(), 
-                        file.getName(), 
+                        entry.getKey(),
+                        fileName,
                         RequestBody.create(
-                            MediaType.parse(guessMimeType(file.getName())), 
-                            file
+                            MediaType.parse(guessMimeType(fileName)),
+                            file.toFile()
                         )
                     );
                 }

@@ -11,6 +11,12 @@ import com.uoquo.utils.http.listener.ProgressDownloadListener;
 import com.uoquo.utils.http.listener.ProgressUploadListener;
 
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.net.FileNameMap;
 import java.net.URLConnection;
 import java.util.*;
@@ -421,25 +427,29 @@ public class HttpUtil {
         if (parms != null) {
             MultipartBody.Builder body = new MultipartBody.Builder().setType(MultipartBody.FORM);
             // 拼装文件
-            Map<String, List<File>> fileParam = parms.getFileParams();
+            Map<String, List<Path>> fileParam = parms.getFileParams();
             for (String key : fileParam.keySet()) {
                 flag = false;
-                List<File> list = fileParam.get(key);
-                for (final File file : list) {
-                    final String fileName = file.getName();
+                List<Path> list = fileParam.get(key);
+                for (final Path file : list) {
+                    final String fileName = file.getFileName().toString();
                     body.addFormDataPart(key, fileName, new RequestBody() {
                         @Override public MediaType contentType() {
                             return MediaType.parse(guessMimeType(fileName));
                         }
                         
-                        @Override public long contentLength() {
-                            return file.length();
+                        public long contentLength() {
+                            try {
+                                return Files.size(file);
+                            } catch (IOException e) {
+                                return 0;
+                            }
                         }
                         
                         @Override public void writeTo(@NonNull BufferedSink sink) throws IOException {
                             Source source = null;
                             try {
-                                source = Okio.source(file);
+                                source = Okio.source(file.toFile());
                                 /* 容易内存泄漏，因此也是读取一段发送一段
                                 // 没有回调时，全部放入
                                 if (progress == null) {
@@ -594,7 +604,10 @@ public class HttpUtil {
      * @throws Exception 错误信息
      */
     public static String uploadByRange(String url, HttpParams parms, File file) throws Exception {
-        return uploadByRange(url, parms, file, null, null, null);
+        if (file == null) {
+            throw new IllegalArgumentException("文件参数必须传入");
+        }
+        return uploadByRange(url, parms, file.toPath(), null, null, null);
     }
 
     /**
@@ -607,7 +620,10 @@ public class HttpUtil {
      * @throws Exception 错误信息
      */
     public static String uploadByRange(String url, HttpParams parms, File file, ProgressUploadListener progress) throws Exception {
-        return uploadByRange(url, parms, file, null, null, progress);
+        if (file == null) {
+            throw new IllegalArgumentException("文件参数必须传入");
+        }
+        return uploadByRange(url, parms, file.toPath(), null, null, progress);
     }
 
     /**
@@ -638,22 +654,38 @@ public class HttpUtil {
      * @throws Exception 错误信息
      */
     public static String uploadByRange(String url, HttpParams parms, File file, HttpHeaders headers, HttpCookies cookies, final ProgressUploadListener progress) throws Exception {
+        if (file == null) {
+            throw new IllegalArgumentException("文件参数必须传入");
+        }
+        return uploadByRange(url, parms, file.toPath(), headers, cookies, progress);
+    }
+
+    /**
+     * 文件断点上传（Path API）。
+     */
+    public static String uploadByRange(String url, HttpParams parms, Path file, HttpHeaders headers, HttpCookies cookies, final ProgressUploadListener progress) throws Exception {
         // 1. 参数校验
         // 1.1 文件有效性判断
         if (file == null) {
             throw new IllegalArgumentException("文件参数必须传入");
         }
-        if (!file.exists()) {
-            throw new FileNotFoundException(String.format("文件[%s]不存在", file.getAbsolutePath()));
+        if (!Files.exists(file)) {
+            throw new FileNotFoundException(String.format("文件[%s]不存在", file.toAbsolutePath()));
         }
-        if (!file.isFile()) {
-            throw new FileNotFoundException(String.format("[%s]不是一个有效的文件", file.getAbsolutePath()));
+        if (!Files.isRegularFile(file)) {
+            throw new FileNotFoundException(String.format("[%s]不是一个有效的文件", file.toAbsolutePath()));
         }
-        if (!file.canRead()) {
-            throw new IllegalArgumentException(String.format("[%s]无法读取", file.getAbsolutePath()));
+        if (!Files.isReadable(file)) {
+            throw new IllegalArgumentException(String.format("[%s]无法读取", file.toAbsolutePath()));
         }
-        if (file.length() == 0) {
-            throw new IllegalArgumentException(String.format("[%s]为空文件，不可以采用分片上传", file.getAbsolutePath()));
+        final long fileLen;
+        try {
+            fileLen = Files.size(file);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(String.format("[%s]无法读取文件大小", file.toAbsolutePath()), e);
+        }
+        if (fileLen == 0) {
+            throw new IllegalArgumentException(String.format("[%s]为空文件，不可以采用分片上传", file.toAbsolutePath()));
         }
         // 1.2 参数文件不需要
         if ((parms != null) && !parms.getFileParams().isEmpty()) {
@@ -661,7 +693,6 @@ public class HttpUtil {
         }
 
         // 2. 分块上传
-        long fileLen = file.length();
         int  partLen = BUF_SIZE * 5; // 分块长度（每次上传5M）
         int  partIdx = 0; // 正在上传的块序号
         int  partNum = 0; // 已上传的块数量
@@ -671,7 +702,7 @@ public class HttpUtil {
         if (headers == null) {
             headers = new HttpHeaders();
         }
-        String fileMd5 = MD5.encryptFile(file.getAbsolutePath(), null);
+        String fileMd5 = MD5.encryptFile(file, null, 1000, 100, false);
         headers.add("file-md5",    fileMd5);
         headers.add("file-length", fileLen);
         headers.add("part-length", partLen);
@@ -685,17 +716,21 @@ public class HttpUtil {
                 len = partLen;
             }
             byte[] data = new byte[(int)len];
-            try (
-                RandomAccessFile raf = new RandomAccessFile(file, "r");
-            ) {
-                raf.seek((long) partIdx * partLen);
-                raf.read(data);
+            try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
+                ByteBuffer dataBuffer = ByteBuffer.wrap(data);
+                long position = (long) partIdx * partLen;
+                while (dataBuffer.hasRemaining()) {
+                    int read = channel.read(dataBuffer, position + dataBuffer.position());
+                    if (read <= 0) {
+                        break;
+                    }
+                }
             }
             // 2.2 上传当前块
             headers.remove("part-index");
             headers.add("part-index", partIdx);
             try {
-                Response response = uploadByRange(url, parms, data, file.getName(), fileLen, (long) partNum * partLen, client, headers, progress);
+                Response response = uploadByRange(url, parms, data, file.getFileName().toString(), fileLen, (long) partNum * partLen, client, headers, progress);
                 if (response.code() == 200) {
                     // 成功响应：获取下一个未上传分块，如果上传完，则返回结果
                     String unfinish = response.header("part-unfinish"); // 未完成的分块序号
@@ -873,52 +908,40 @@ public class HttpUtil {
      * @throws Exception 错误信息
      */
     public static void download(String url, HttpParams parms, HttpHeaders headers, HttpCookies cookies, ProgressDownloadListener progress, String filePath) throws Exception {
-        // 创建对应的文件夹
-        /*
-        int idx = filePath.lastIndexOf("/");
-        idx = (idx > 0) ? idx : filePath.lastIndexOf("\\");
-        if (idx == -1) {
-            throw new Exception("文件[" + filePath + "]路径格式不正确.");
-        }
-        String path = filePath.substring(0, idx);
-        File file = new File(path);
-        if (!file.exists()) {
-            file.mkdirs();
-        }
-        */
-        // 判断要下载的文件是否存在
-        File file = new File(filePath);
-        if (file.exists()) {
-            if (file.isFile()) {
-                // 如果是已经存在的文件，则返回错误
-                throw new Exception("文件[" + filePath + "]已经存在，请重新指定下载保存地址.");
-            } else {
-                // 如果是已经存在的文件夹，则拼接URL中的文件名
-                filePath = file.getAbsolutePath() + File.separator + url.substring(url.lastIndexOf("/"));
+        download(url, parms, headers, cookies, progress, Path.of(filePath));
+    }
+
+    /**
+     * 文件下载到本地（Path API，使用临时文件完成提交）。
+     */
+    public static void download(String url, HttpParams parms, HttpHeaders headers, HttpCookies cookies, ProgressDownloadListener progress, Path target) throws Exception {
+        if (Files.exists(target)) {
+            if (Files.isRegularFile(target)) {
+                throw new Exception("文件[" + target + "]已经存在，请重新指定下载保存地址.");
             }
-        } else if (!file.getParentFile().exists()) {
-            file.getParentFile().mkdirs(); // 父目录不存在时，创建父级目录
+            String name = url.substring(url.lastIndexOf('/') + 1);
+            if (StringUtil.isNull(name)) {
+                throw new Exception("无法从 URL 获取下载文件名：[" + url + "]");
+            }
+            target = target.resolve(name);
         }
-        // 临时文件
-        File cache = new File(filePath + ".temp");
-        if (cache.exists()) {
-            cache.delete();
+        Path parent = target.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
         }
-        cache.createNewFile();
-        FileOutputStream out = new FileOutputStream(cache);
-        try {
+
+        Path cache = target.resolveSibling(target.getFileName() + ".temp");
+        Files.deleteIfExists(cache);
+        try (OutputStream out = Files.newOutputStream(cache,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE)) {
             download(url, parms, headers, cookies, progress, out);
-            out.close();
-            cache.renameTo(file); // 移动文件，必须先关闭cache的文件流
         } catch (Exception e) {
-            try {
-                out.close();
-                cache.delete(); // 删除临时文件
-            } catch (Exception e2) {
-                // do nothing
-            }
+            Files.deleteIfExists(cache);
             throw e;
         }
+        Files.move(cache, target, StandardCopyOption.REPLACE_EXISTING);
     }
     
     /**

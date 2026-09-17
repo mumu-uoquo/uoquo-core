@@ -7,6 +7,10 @@ package com.uoquo.utils;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -69,40 +73,49 @@ public class FileUtil {
      * @param destPath 目标文件夹
      */
     public static void copyDir(String srcPath, String destPath) throws IOException {
-        copyDir(new File(srcPath), new File(destPath), true);
+        copyDir(Path.of(srcPath), Path.of(destPath), true);
     }
 
     /**
-     * 目录复制.<br>
-     * @param src     待复制的文件
-     * @param dest    目标文件
-     * @param overlay 如果目标文件存在，是否覆盖
+     * 目录复制（兼容 File API）.
      */
     public static void copyDir(File src, File dest, boolean overlay) throws IOException {
-        // 源目录处理
-        if (!src.exists()) {
-            throw new IllegalArgumentException(String.format("源目录[%s]不存在！", src.getAbsolutePath()));
-        } else if (!src.isDirectory()) {
-            throw new IllegalArgumentException(String.format("源目录[%s]不是有效的文件目录！", src.getAbsolutePath()));
+        copyDir(src.toPath(), dest.toPath(), overlay);
+    }
+
+    /**
+     * 目录复制（Path API）.
+     * @param src     待复制的目录
+     * @param dest    目标目录
+     * @param overlay 如果目标文件存在，是否覆盖
+     */
+    public static void copyDir(Path src, Path dest, boolean overlay) throws IOException {
+        if (!Files.exists(src)) {
+            throw new IllegalArgumentException(String.format("源目录[%s]不存在！", src.toAbsolutePath()));
+        } else if (!Files.isDirectory(src)) {
+            throw new IllegalArgumentException(String.format("源目录[%s]不是有效的文件目录！", src.toAbsolutePath()));
         }
 
-        // 目标目录处理
-        if (!dest.exists()) {
-            dest.mkdirs();
+        if (Files.exists(dest) && !Files.isDirectory(dest)) {
+            throw new IllegalArgumentException(String.format("目标路径[%s]不是有效的目录！", dest.toAbsolutePath()));
         }
-        // 文件复制
-        File[] list = src.listFiles();
-        if (list == null) {
-            log.info("can't copy dir [{}], there has no children.", src.getAbsolutePath());
-            return;
-        }
-        for (File item : list) {
-            File temp = new File(dest.getAbsolutePath() + File.separator + item.getName());
-            if (item.isDirectory()) {
-                copyDir(item, temp, overlay);
-            } else if (item.isFile()) {
-                copyFile(item, temp, overlay);
-            }
+        Files.createDirectories(dest);
+
+        try (var stream = Files.list(src)) {
+            stream.forEach(item -> {
+                Path target = dest.resolve(item.getFileName().toString());
+                try {
+                    if (Files.isDirectory(item)) {
+                        copyDir(item, target, overlay);
+                    } else if (Files.isRegularFile(item)) {
+                        copyFile(item, target, overlay);
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
         }
     }
     
@@ -111,57 +124,45 @@ public class FileUtil {
      * 注：如果目标存在，将会被覆盖！！
      */
     public static void copyFile(String srcFile, String destFile) throws IOException {
-        copyFile(new File(srcFile), new File(destFile), true);
+        copyFile(Path.of(srcFile), Path.of(destFile), true);
     }
-    
+
     /**
-     * 复制单个文件 （普通）.
-     * @param src     待复制的文件
-     * @param dest    目标文件
-     * @param overlay 如果目标文件存在，是否覆盖
+     * 复制单个文件（兼容 File API）.
      */
     public static void copyFile(File src, File dest, boolean overlay) throws IOException {
-        // 判断源文件是否存在
-        if (!src.exists()) {
-            throw new IllegalArgumentException(String.format("源文件[%s]不存在！", src.getAbsolutePath()));
-        } else if (!src.isFile()) {
-            throw new IllegalArgumentException(String.format("源文件[%s]不是有效的文件！", src.getAbsolutePath()));
+        copyFile(src.toPath(), dest.toPath(), overlay);
+    }
+
+    /**
+     * 复制单个文件（Path API）.
+     */
+    public static void copyFile(Path src, Path dest, boolean overlay) throws IOException {
+        if (!Files.exists(src)) {
+            throw new IllegalArgumentException(String.format("源文件[%s]不存在！", src.toAbsolutePath()));
+        } else if (!Files.isRegularFile(src)) {
+            throw new IllegalArgumentException(String.format("源文件[%s]不是有效的文件！", src.toAbsolutePath()));
         }
-        // 目标文件不存在（或非文件）的处理
-        if (!dest.exists()) {
-            // 如果目标文件所在目录不存在，则创建目录
-            if (!dest.getParentFile().exists()) {
-                // 目标文件所在目录不存在
-                if (!dest.getParentFile().mkdirs()) {
-                    throw new IOException(String.format("复制文件失败：创建目标文件所在目录[%s]失败！", dest.getParent()));
-                }
-            }
-        } else if (dest.isDirectory()) {
-            // 如果目标是文件夹，则自动创建文件
-            dest = new File (dest.getAbsolutePath() + File.separator + src.getName());
+
+        if (Files.exists(dest) && Files.isDirectory(dest)) {
+            dest = dest.resolve(src.getFileName().toString());
         }
-        // 判断目标文件是否存在
-        if (dest.exists()) {
-            if (!overlay) {
-                throw new IllegalArgumentException(String.format("目标文件[%s]已经存在！", dest.getAbsolutePath()));
-            }
-            // 如果目标文件存在并允许覆盖
-            // 删除已经存在的目标文件，无论目标文件是目录还是单个文件
-            delete(dest);
+        Path parent = dest.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
         }
-        // 复制文件
-        try (
-            InputStream in  = new FileInputStream(src);
-            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(dest), BUF_SIZE);
-        ) {
-            int byteread  = 0; // 读取的字节数
-            byte[] buffer = new byte[BUF_SIZE];
-            while ((byteread = in.read(buffer)) != -1) {
-                out.write(buffer, 0, byteread);
+        if (Files.exists(dest) && !overlay) {
+            throw new IllegalArgumentException(String.format("目标文件[%s]已经存在！", dest.toAbsolutePath()));
+        }
+
+        try {
+            if (overlay) {
+                Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Files.copy(src, dest);
             }
-            out.flush();
         } catch (IOException e) {
-            log.error("复制文件失败：源[{}], 目标[{}]！", src.getAbsolutePath(), dest.getAbsolutePath());
+            log.error("复制文件失败：源[{}], 目标[{}]！", src.toAbsolutePath(), dest.toAbsolutePath());
             throw e;
         }
     }
@@ -173,36 +174,36 @@ public class FileUtil {
      * @return 如果删除成功返回true，否则返回false
      */
     public static boolean clearDir(String dir) {
-        return clearDir(new File(dir));
+        return clearDir(Path.of(dir));
     }
-    
+
     /**
-     * 清空文件夹下的内容（保留传入的根目录）.
-     * 注：目录支持级联删除
-     * @param dir 待清空的目录
-     * @return 如果删除成功返回true，否则返回false
+     * 清空目录（兼容 File API）.
      */
     public static boolean clearDir(File dir) {
-        if (!dir.exists()) {
-            // 文件夹不存在时，不处理
-            return false;
-        } else if (!dir.isDirectory()) {
-            // 非目录不处理
+        return clearDir(dir.toPath());
+    }
+
+    /**
+     * 清空目录（Path API，保留根目录）.
+     */
+    public static boolean clearDir(Path dir) {
+        if (!Files.exists(dir) || !Files.isDirectory(dir)) {
             return false;
         }
-        // 目录则级联删除
-        File[] list = dir.listFiles();
-        if (list == null) {
-            return true;
-        }
-        for (File item : list) {
-            boolean success = delete(item);
-            if (!success) {
-                log.warn("can't clear dir [{}], delete file [{}] fail.", dir.getAbsolutePath(), item.getAbsolutePath());
-                return false;
+        try (var stream = Files.list(dir)) {
+            var items = stream.toList();
+            for (Path item : items) {
+                if (!delete(item)) {
+                    log.warn("can't clear dir [{}], delete file [{}] fail.", dir.toAbsolutePath(), item.toAbsolutePath());
+                    return false;
+                }
             }
+            return true;
+        } catch (IOException e) {
+            log.warn("can't list dir [{}].", dir.toAbsolutePath(), e);
+            return false;
         }
-        return true;
     }
     
     /**
@@ -212,37 +213,40 @@ public class FileUtil {
      * @return 如果删除成功返回true，否则返回false
      */
     public static boolean delete(String file) {
-        return delete(new File(file));
+        return delete(Path.of(file));
     }
-    
+
     /**
-     * 删除文件（目录，包括自己）.
-     * 注：目录支持级联删除
-     * @param file 待删除的文件（目录）
-     * @return 如果删除成功返回true，否则返回false
+     * 删除文件或目录（兼容 File API）.
      */
     public static boolean delete(File file) {
-        if (!file.exists()) {
-            // 不存在时，不处理
+        return delete(file.toPath());
+    }
+
+    /**
+     * 删除文件或目录（Path API）.
+     */
+    public static boolean delete(Path file) {
+        if (!Files.exists(file)) {
             return false;
-        } else if (!file.isDirectory()) {
-            // 非目录直接删除
-            return file.delete();
         }
-        File[] list = file.listFiles();
-        if (list == null) {
-            // 无子内容时，直接删除
-            return file.delete();
-        }
-        // 目录则级联删除
-        for (File item : list) {
-            boolean success = delete(item);
-            if (!success) {
-                log.warn("can't delete dir [{}], delete file [{}] fail.", file.getAbsolutePath(), item.getAbsolutePath());
-                return false;
+        try {
+            if (Files.isDirectory(file)) {
+                try (var stream = Files.list(file)) {
+                    for (Path item : stream.toList()) {
+                        if (!delete(item)) {
+                            log.warn("can't delete dir [{}], delete file [{}] fail.", file.toAbsolutePath(), item.toAbsolutePath());
+                            return false;
+                        }
+                    }
+                }
             }
+            Files.deleteIfExists(file);
+            return true;
+        } catch (IOException e) {
+            log.warn("can't delete file [{}].", file.toAbsolutePath(), e);
+            return false;
         }
-        return file.delete();
     }
     
     /**
@@ -252,7 +256,7 @@ public class FileUtil {
      * @param dest    目标文件
      */
     public static void move(String src, String dest) throws IOException {
-        move(new File(src), new File(dest), true);
+        move(Path.of(src), Path.of(dest), true);
     }
 
     /**
@@ -262,32 +266,36 @@ public class FileUtil {
      * @param overlay 如果目标文件存在，是否覆盖
      */
     public static void move(File src, File dest, boolean overlay) throws IOException {
-        // 判断源文件是否存在
-        if (!src.exists()) {
-            throw new IllegalArgumentException(String.format("源文件[%s]不存在！", src.getAbsolutePath()));
-        } else if (!src.isFile()) {
-            throw new IllegalArgumentException(String.format("源文件[%s]不是有效的文件！", src.getAbsolutePath()));
+        move(src.toPath(), dest.toPath(), overlay);
+    }
+
+    /**
+     * 文件迁移（Path API）.
+     */
+    public static void move(Path src, Path dest, boolean overlay) throws IOException {
+        if (!Files.exists(src)) {
+            throw new IllegalArgumentException(String.format("源文件[%s]不存在！", src.toAbsolutePath()));
+        } else if (!Files.isRegularFile(src)) {
+            throw new IllegalArgumentException(String.format("源文件[%s]不是有效的文件！", src.toAbsolutePath()));
         }
-        // 判断目标文件是否存在
-        if (dest.exists()) {
+        if (Files.exists(dest)) {
             if (!overlay) {
-                throw new IllegalArgumentException(String.format("目标文件[%s]已经存在！", dest.getAbsolutePath()));
+                throw new IllegalArgumentException(String.format("目标文件[%s]已经存在！", dest.toAbsolutePath()));
             }
-            // 如果目标文件存在并允许覆盖
-            // 删除已经存在的目标文件，无论目标文件是目录还是单个文件
             delete(dest);
         }
-        // 采用java自带改名方法（主要适用于同一磁盘下）
-        if (src.renameTo(dest)) {
-            return;
-        }
-        // 如果不成功，则手动复制
-        if (src.isDirectory()) {
-            copyDir(src, dest, overlay);
-        } else {
+        try {
+            if (overlay) {
+                Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Files.move(src, dest);
+            }
+        } catch (IOException e) {
             copyFile(src, dest, overlay);
+            if (!delete(src)) {
+                throw new IOException(String.format("移动文件失败：删除源文件[%s]失败！", src.toAbsolutePath()), e);
+            }
         }
-        delete(src);
     }
 
     /**
@@ -296,10 +304,17 @@ public class FileUtil {
      * @param data 内容字串
      */
     public static boolean write(File file, String data) {
+        return write(file.toPath(), data);
+    }
+
+    /**
+     * 将内容追加写入文件（Path API）.
+     */
+    public static boolean write(Path file, String data) {
         try {
             return write(file, data.getBytes(StandardCharsets.UTF_8), true);
         } catch (Exception e) {
-            log.warn("can't write data [{}] to file [{}] as UTF-8.", data, file.getAbsolutePath(), e);
+            log.warn("can't write data [{}] to file [{}] as UTF-8.", data, file.toAbsolutePath(), e);
             return write(file, data.getBytes(), true);
         }
     }
@@ -311,19 +326,26 @@ public class FileUtil {
      * @param append 是否追加
      */
     public static boolean write(File file, byte[] data, boolean append) {
-        // 目标路径不存在时，创建
-        if (!file.getParentFile().exists()) {
-            file.getParentFile().mkdirs();
-        }
-        // 写入文件
-        try (
-            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file, append), BUF_SIZE);
-        ) {
-            out.write(data);
-            out.flush();
+        return write(file.toPath(), data, append);
+    }
+
+    /**
+     * 将内容写入文件（Path API）.
+     */
+    public static boolean write(Path file, byte[] data, boolean append) {
+        Path parent = file.getParent();
+        try {
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            if (append) {
+                Files.write(file, data, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            } else {
+                Files.write(file, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            }
             return true;
         } catch (Exception e) {
-            log.warn("can't write data [{}] to file [{}].", StringUtil.byte2hex(data), file.getAbsolutePath(), e);
+            log.warn("can't write data [{}] to file [{}].", StringUtil.byte2hex(data), file.toAbsolutePath(), e);
             return false;
         }
     }
@@ -333,27 +355,24 @@ public class FileUtil {
      * @param file 文件路径
      */
     public static byte[] read(File file) throws IOException {
-        if (!file.isFile()) {
-            String message = String.format("读取文件失败：[%s] 不是有效文件", file.getAbsolutePath());
+        return read(file.toPath());
+    }
+
+    /**
+     * 读取文件（Path API）.
+     */
+    public static byte[] read(Path file) throws IOException {
+        if (!Files.isRegularFile(file)) {
+            String message = String.format("读取文件失败：[%s] 不是有效文件", file.toAbsolutePath());
             throw new IOException(message);
-        } else if (!file.canRead()) {
-            String message = String.format("读取文件失败：[%s] 不是可读文件", file.getAbsolutePath());
+        } else if (!Files.isReadable(file)) {
+            String message = String.format("读取文件失败：[%s] 不是可读文件", file.toAbsolutePath());
             throw new IOException(message);
         }
-        // 读取文件
-        try (
-                InputStream in  = new FileInputStream(file);
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ) {
-            int byteread  = 0; // 读取的字节数
-            byte[] buffer = new byte[BUF_SIZE];
-            while ((byteread = in.read(buffer)) != -1) {
-                out.write(buffer, 0, byteread);
-            }
-            out.flush();
-            return out.toByteArray();
+        try {
+            return Files.readAllBytes(file);
         } catch (IOException e) {
-            log.error("读取文件失败：[{}]", file.getAbsolutePath(), e);
+            log.error("读取文件失败：[{}]", file.toAbsolutePath(), e);
             throw e;
         }
     }

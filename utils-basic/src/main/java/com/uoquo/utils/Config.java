@@ -8,10 +8,12 @@ package com.uoquo.utils;
 import com.uoquo.utils.crypto.SnowFlake;
 import com.uoquo.utils.json.JsonUtil;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
-
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -128,9 +130,7 @@ public class Config {
                     }
                     try {
                         // 得到的是执行命令所在位置路径（如：/home/app/jetty-8007）
-                        File file = new File(".");
-                        APP_PATH = file.getAbsolutePath();
-                        APP_PATH = APP_PATH.substring(0, APP_PATH.length() - 1); // 去除最后一位的“.”
+                        APP_PATH = Path.of(".").toAbsolutePath().normalize().toString();
                         // 各种获取路径方式的比较
                         // class文件方式：
                         // Config.class.getResource("")  // file:/home/app/uoquo-boss/WEB-INF/classes/com/uoquo/utils/
@@ -545,7 +545,7 @@ public class Config {
         // 2. 读取APP_PATH下的config
         String configPath = Config.APP_PATH + "/config/" + configName;
         try (
-            InputStream inputStrem = new FileInputStream(configPath);
+            InputStream inputStrem = Files.newInputStream(Path.of(configPath));
         ) {
             parseProperties(inputStrem);
             info("cache config from app_path file [{}] end.", configPath);
@@ -607,7 +607,7 @@ public class Config {
         // 2. 读取APP_PATH下的config
         String configPath = Config.APP_PATH + "/config/" + configName;
         try (
-            InputStream inputStrem = new FileInputStream(configPath);
+            InputStream inputStrem = Files.newInputStream(Path.of(configPath));
         ) {
             Yaml yaml = new Yaml();
             Map<String, Object> map = yaml.loadAs(inputStrem, Map.class);
