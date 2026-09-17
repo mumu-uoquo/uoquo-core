@@ -662,6 +662,7 @@ public class HttpUtil {
 
     /**
      * 文件断点上传（Path API）。
+     * 默认在请求头中添加文件的全量MD5值
      */
     public static String uploadByRange(String url, HttpParams parms, Path file, HttpHeaders headers, HttpCookies cookies, final ProgressUploadListener progress) throws Exception {
         // 1. 参数校验
@@ -702,8 +703,10 @@ public class HttpUtil {
         if (headers == null) {
             headers = new HttpHeaders();
         }
-        String fileMd5 = MD5.encryptFile(file, null, 1000, 100, false);
-        headers.add("file-md5",    fileMd5);
+        if (!headers.exist("file-md5")) {
+            String fileMd5 = MD5.encryptFile(file);
+            headers.add("file-md5",    fileMd5);
+        }
         headers.add("file-length", fileLen);
         headers.add("part-length", partLen);
         OkHttpClient client = getClientOnce(cookies);
