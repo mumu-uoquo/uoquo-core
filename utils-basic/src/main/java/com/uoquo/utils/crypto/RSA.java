@@ -67,15 +67,30 @@ public class RSA {
     private static final int DEFAULT_KEY_SIZE = 2048;
     
     /**
-     * 最大解密密文大小（基于默认密钥长度）.
+     * 根据 RSA 密钥的实际模长计算最大加密明文块大小（字节）.
+     * <p>加密块 = keySize/8 - 11，必须严格依据运行时使用的密钥长度计算，
+     * 否则在密钥长度小于默认值时（如 1024 位）会因超出上限而抛出
+     * {@link javax.crypto.IllegalBlockSizeException}（Data must not be longer than 117 bytes）。</p>
+     *
+     * @param key RSA 公钥或私钥
+     * @return 最大加密明文块大小（字节）
      */
-    private static final int MAX_DECRYPT_BLOCK = DEFAULT_KEY_SIZE / 8;
-    
+    private static int getMaxEncryptBlock(Key key) {
+        int keySize = ((java.security.interfaces.RSAKey) key).getModulus().bitLength();
+        return keySize / 8 - 11;
+    }
+
     /**
-     * 最大加密明文大小（基于默认密钥长度）.
-     * RSA 加密有 11 字节的 PKCS#1 v1.5 padding 开销
+     * 根据 RSA 密钥的实际模长计算最大解密密文块大小（字节）.
+     * <p>解密块 = keySize/8，必须严格依据运行时使用的密钥长度计算。</p>
+     *
+     * @param key RSA 公钥或私钥
+     * @return 最大解密密文块大小（字节）
      */
-    private static final int MAX_ENCRYPT_BLOCK = MAX_DECRYPT_BLOCK - 11;
+    private static int getMaxDecryptBlock(Key key) {
+        int keySize = ((java.security.interfaces.RSAKey) key).getModulus().bitLength();
+        return keySize / 8;
+    }
     
     /**
      * 支持的密钥长度集合.
@@ -309,7 +324,7 @@ public class RSA {
         Cipher cipher = Cipher.getInstance(keyFct.getAlgorithm());
         cipher.init(Cipher.ENCRYPT_MODE, pubKey);
         
-        return cipherSection(infoData, cipher, MAX_ENCRYPT_BLOCK);
+        return cipherSection(infoData, cipher, getMaxEncryptBlock(pubKey));
     }
 
     /**
@@ -362,7 +377,7 @@ public class RSA {
         Cipher cipher = Cipher.getInstance(ALGORITHM_ENCRYPT);
         cipher.init(Cipher.DECRYPT_MODE, priKey);
 
-        return cipherSection(rawData, cipher, MAX_DECRYPT_BLOCK);
+        return cipherSection(rawData, cipher, getMaxDecryptBlock(priKey));
     }
 
     /**
@@ -414,7 +429,7 @@ public class RSA {
         Cipher cipher = Cipher.getInstance(keyFct.getAlgorithm());
         cipher.init(Cipher.ENCRYPT_MODE, priKey);
 
-        return cipherSection(infoData, cipher, MAX_ENCRYPT_BLOCK);
+        return cipherSection(infoData, cipher, getMaxEncryptBlock(priKey));
     }
     
     /**
@@ -467,7 +482,7 @@ public class RSA {
         Cipher cipher = Cipher.getInstance(ALGORITHM_ENCRYPT);
         cipher.init(Cipher.DECRYPT_MODE, pubKey);
         
-        return cipherSection(rawData, cipher, MAX_DECRYPT_BLOCK);
+        return cipherSection(rawData, cipher, getMaxDecryptBlock(pubKey));
     }
     
     /**

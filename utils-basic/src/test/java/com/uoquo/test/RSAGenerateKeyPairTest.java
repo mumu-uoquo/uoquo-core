@@ -3,7 +3,9 @@
  */
 package com.uoquo.test;
 
+import com.uoquo.utils.Config;
 import com.uoquo.utils.StringUtil;
+import com.uoquo.utils.crypto.License;
 import com.uoquo.utils.crypto.MD5;
 import com.uoquo.utils.crypto.RSA;
 import org.junit.jupiter.api.Test;
@@ -73,6 +75,22 @@ class RSAGenerateKeyPairTest {
             pswd = RSA.decrypt(pswd, prikey);
             System.out.println(pswd);
             System.out.println(RSA.decrypt(str, prikey));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testLicense() {
+        try {
+            Config.put("app.name", "test");
+            Config.put("app.port", "");
+            String code = License.getMachineInfo();
+            System.out.println(code);
+
+            String PRIVATE_KEY = "30820275020100300d06092a864886f70d01010105000482025f3082025b02010002818100877ddb82b5800e2059e15fd7ab1f984be2468e9bc44d57395729f3e18529ab085a412bcd174f3f426b7bdda08667ee76e2fc238813bd2019058fa5c47ca8bd052b12ecce22d25f288a9e3b147d752eb04dbb39e5327530d6d1ed279b0364a78eeabafabd3b6d55d0b7060c4f1fbbd38c683b6b42dcd16c1480d440bf1a84a49f0203010001028180686b235fc196f5cc12d8b0ef59ef1884ead6ab92fa1f0ca8a13730bfcdcb460742df54ed53187ccd285ea677cefd8bf6cd89b9ac6661ebb9bce26ec355bb092831e2ab9cbfd1865ca894f750720af02c8da233a602dc0462f1642b160bf90257519311075ce62b9b430c1ecf70eaf803b4a9c78b3524750840214d7be83c6519024100c6302ed7c29b1fe8643d159e6480545409b97b2eb64d7d340f2b747df3d0b3c11e3b67297ccda1f25a8e26f5e6eb7ea11806597582dded2446db5da281c3fbd3024100af03c58863d7f23e0aaa8f7e9350d10e99b3f4a6df00bba78e8a10721a02438d39a8af5357e2b64a090ad0afa0b7d5e2ebdc9747627a6e6d257e0418dccff08502404cf97dd8131f88df0bbfa5dbe510eaafd12f1726e76b654b88f0c9c7f9a07f906c1b8a4fd4c75134fdf2e432f1c359655c1d6b3576e4972c55d0f1a7225b6a3d024076ec942ca2d3d98ae90a8f294e874b17a5c00fcdd89911eac0c3f67ae24b89858c99a0517cd5d452a8a44dbc19f4f1851a0ab24d5290a93ac79042ce763562550240759be5b4cba78c75770986f95c35102083d891abccb88a1e3464a93b93e9d83bb7ce653a4ab1a43e07cfc048843f165eccd2cf0fe24b0f76dc30348282061ca7";
+            String str = RSA.decrypt(code, PRIVATE_KEY);
+            System.out.println(str);
         } catch (Exception e) {
             e.printStackTrace();
         }
