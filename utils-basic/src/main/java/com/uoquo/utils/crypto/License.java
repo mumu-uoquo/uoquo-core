@@ -11,8 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +38,7 @@ import com.uoquo.utils.json.JsonUtil;
  * 授权文件 JSON 结构（由授权方颁发）：
  * <pre>{@code
  * {
- *   "machineCode": "AABBCCDDEEFF",   // 机器码（MAC，逗号分隔多块网卡）
+ *        "machineCode": "sha256-hex-digest", // 硬件信息摘要（SHA-256，小写十六进制）
  *   "appName":     "my-app",         // 应用名称
  *   "appPort":     "8080",           // 应用端口（可为空）
  *   "timestamp":   1720000000000,    // 颁发时间戳
@@ -77,6 +81,11 @@ public class License {
     private static final String PUBLIC_KEY = "30819f300d06092a864886f70d010101050003818d0030818902818100877ddb82b5800e2059e15fd7ab1f984be2468e9bc44d57395729f3e18529ab085a412bcd174f3f426b7bdda08667ee76e2fc238813bd2019058fa5c47ca8bd052b12ecce22d25f288a9e3b147d752eb04dbb39e5327530d6d1ed279b0364a78eeabafabd3b6d55d0b7060c4f1fbbd38c683b6b42dcd16c1480d440bf1a84a49f0203010001";
 
     /**
+     * 机器码摘要协议版本。摘要输入包含该版本，后续扩展硬件字段时可通过升级版本避免规则歧义。
+     */
+    private static final String MACHINE_CODE_VERSION = "uoquo-machine-code-v1";
+
+    /**
      * 授权文件路径.
      */
     private static final String LICENSE_FILE = Config.APP_PATH + "/config/license.dat";
@@ -112,7 +121,7 @@ public class License {
      */
     public static class LicenseInfo {
 
-        /** 机器码（物理网卡 MAC，去连字符、大写，多块网卡逗号分隔，已排序）. */
+        /** 硬件信息摘要机器码（SHA-256，小写十六进制；当前输入为规范化物理网卡 MAC）. */
         private String machineCode;
 
         /** 应用名称（对应 {@code app.name}）. */
@@ -176,7 +185,7 @@ public class License {
      * <p>
      * 收集以下信息并组装为 {@link LicenseInfo}：<br>
      * <ul>
-     *   <li>{@code machineCode}：物理网卡 MAC 地址（无连字符、大写，多块网卡逗号分隔，已排序）</li>
+     *   <li>{@code machineCode}：硬件信息摘要（SHA-256，小写十六进制；当前包含规范化物理网卡 MAC）</li>
      *   <li>{@code appName}：应用名称（{@code app.name}）</li>
      *   <li>{@code appPort}：应用端口（{@code app.port}，可为空）</li>
      *   <li>{@code serialNo}：序列号（由调用方传入，可为空）</li>
@@ -244,29 +253,68 @@ public class License {
             throw new IllegalArgumentException("授权内容不能为空");
         }
 
-        // 1. 解密，得到授权 JSON 明文
-        String plainText;
-        try {
-            plainText = RSA.decryptByPublicKey(encryptedContent, PUBLIC_KEY);
-        } catch (GeneralSecurityException | IOException e) {
-            log.error("writeLicense: RSA decrypt failed.", e);
-            throw new RuntimeException("授权内容解密失败，请确认授权文件来源正确。", e);
-        }
+        // 1. 解析并校验授权内容
+        parse(encryptedContent);
 
-        // 2. 解析 JSON，校验机器信息
-        LicenseInfo licenseInfo = JsonUtil.deserialize(plainText, LicenseInfo.class);
-        if (licenseInfo == null) {
-            throw new IllegalStateException("授权内容格式非法，无法解析为 JSON。");
-        }
-        verifyMachineInfo(licenseInfo);
-
-        // 3. 校验通过，写入密文
+        // 2. 校验通过，写入密文
         writeToFile(LICENSE_FILE, encryptedContent);
         log.info("writeLicense: license written to [{}]", LICENSE_FILE);
     }
 
     // -------------------------------------------------------------------------
-    // 3. 加载授权
+    // 3. 直接解析授权文本
+    // -------------------------------------------------------------------------
+
+    /**
+     * 直接解析授权密文，不写入本地授权文件。
+     *
+     * @param encryptedContent 由私钥加密后的授权密文（hex 字符串），不能为空
+     * @return 解密、反序列化并校验通过的 {@link LicenseInfo}
+     * @throws IllegalArgumentException 当授权文本或目标类型为空时抛出
+     * @throws IllegalStateException    当授权内容格式非法或机器信息不匹配时抛出
+     * @throws RuntimeException         当 RSA 解密或 JSON 反序列化失败时抛出
+     */
+    public static LicenseInfo parse(String encryptedContent) {
+        return parse(encryptedContent, LicenseInfo.class);
+    }
+
+    /**
+     * 直接解析授权密文并反序列化为指定类型，不写入本地授权文件。
+     *
+     * @param <T>               授权信息类型，必须是 {@link LicenseInfo} 或其子类
+     * @param encryptedContent 由私钥加密后的授权密文（hex 字符串），不能为空
+     * @param clazz             目标类型的 Class 对象，不能为 null
+     * @return 解密、反序列化并校验通过的授权信息对象
+     * @throws IllegalArgumentException 当授权文本或 {@code clazz} 为空时抛出
+     * @throws IllegalStateException    当授权内容格式非法或机器信息不匹配时抛出
+     * @throws RuntimeException         当 RSA 解密或 JSON 反序列化失败时抛出
+     */
+    public static <T extends LicenseInfo> T parse(String encryptedContent, Class<T> clazz) {
+        if (StringUtil.isNull(encryptedContent)) {
+            throw new IllegalArgumentException("授权内容不能为空");
+        }
+        if (clazz == null) {
+            throw new IllegalArgumentException("clazz 不能为 null");
+        }
+
+        String plainText;
+        try {
+            plainText = RSA.decryptByPublicKey(encryptedContent.trim(), PUBLIC_KEY);
+        } catch (GeneralSecurityException | IOException e) {
+            log.error("parseLicense: RSA decrypt failed.", e);
+            throw new RuntimeException("授权内容解密失败，请确认授权文本来源正确。", e);
+        }
+
+        T licenseInfo = JsonUtil.deserialize(plainText, clazz);
+        if (licenseInfo == null) {
+            throw new IllegalStateException("授权内容格式非法，无法解析为 JSON。");
+        }
+        verifyMachineInfo(licenseInfo);
+        return licenseInfo;
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. 加载授权文件
     // -------------------------------------------------------------------------
 
     /**
@@ -335,49 +383,61 @@ public class License {
                     String.format("授权文件 [%s] 内容为空，请联系程序提供商进行授权。", LICENSE_FILE));
         }
 
-        // 2. 公钥解密（授权方用私钥加密，此处用公钥解密）
-        String plainText;
-        try {
-            plainText = RSA.decryptByPublicKey(encryptedContent, PUBLIC_KEY);
-            log.debug("loadLicense: license decrypted successfully.");
-        } catch (GeneralSecurityException | IOException e) {
-            log.error("loadLicense: RSA decrypt failed, license file [{}] may be corrupted: {}", LICENSE_FILE, e.getMessage());
-            throw new RuntimeException("授权文件解密失败，请联系程序提供商重新授权。", e);
-        }
-
-        // 3. 反序列化为目标类型，校验机器信息
-        T licenseInfo = JsonUtil.deserialize(plainText, clazz);
-        if (licenseInfo == null) {
-            throw new IllegalStateException("授权内容格式非法，无法解析为 JSON。");
-        }
-        verifyMachineInfo(licenseInfo);
-
-        log.info("loadLicense: license verified successfully.");
-        return licenseInfo;
+        return parse(encryptedContent, clazz);
     }
 
     /**
      * 收集当前运行环境的机器信息，填充为 {@link LicenseInfo} 对象.
-     * <p>填充的字段：{@code machineCode}、{@code appName}、{@code appPort}。</p>
+     * <p>机器码由规范化后的硬件信息拼接后进行 SHA-256 摘要，返回小写十六进制字符串。
+     * 当前包含物理网卡 MAC，后续可在 {@link #buildHardwareMachineCode()} 中按稳定顺序加入
+     * CPU、硬盘、主板、磁盘等硬件信息。</p>
      *
      * @return 包含当前机器信息的 {@link LicenseInfo}
      */
     private static LicenseInfo buildCurrentMachineInfo() {
-        // 机器码：物理网卡 MAC，规范化为无连字符大写，TreeSet 自动排序
+        LicenseInfo info = new LicenseInfo();
+        info.setMachineCode(buildHardwareMachineCode());
+        info.setAppName(Config.getString("app.name", ""));
+        info.setAppPort(Config.getString("app.port", ""));
+        return info;
+    }
+
+    /**
+     * 获取硬件信息并生成机器码。
+     * <p>MAC 采集、物理网卡回退、规范化和摘要输入组装都在此方法内完成，
+     * 调用方只获取最终机器码，避免不同调用方使用不一致的硬件采集规则。</p>
+     * <p>规范化规则：MAC 去连字符、转大写、去重、排序后逗号拼接；
+     * 再按 {@code 版本|字段名=字段值} 格式拼接，最后计算 SHA-256。
+     * 使用字段名和版本号是为了后续增加 CPU、硬盘、主板、磁盘等硬件信息时保持协议明确。</p>
+     *
+     * @return 小写 SHA-256 十六进制机器码；无法获取 MAC 时返回空字符串
+     */
+    private static String buildHardwareMachineCode() {
         List<String> macs = NetworkUtil.getPhysicalMac();
         if (macs.isEmpty()) {
             macs = NetworkUtil.getMacAddress();
         }
+
         Set<String> macSet = new TreeSet<>();
         for (String mac : macs) {
-            macSet.add(mac.replaceAll("-", "").toUpperCase());
+            if (StringUtil.notNull(mac)) {
+                String normalized = mac.replace("-", "").trim().toUpperCase(Locale.ROOT);
+                if (StringUtil.notNull(normalized)) {
+                    macSet.add(normalized);
+                }
+            }
+        }
+        if (macSet.isEmpty()) {
+            return "";
         }
 
-        LicenseInfo info = new LicenseInfo();
-        info.setMachineCode(String.join(",", macSet));
-        info.setAppName(Config.getString("app.name", ""));
-        info.setAppPort(Config.getString("app.port", ""));
-        return info;
+        // 使用 TreeMap 固定硬件字段顺序，后续可加入 cpu、disk、mainboard 等字段。
+        Map<String, String> hardware = new TreeMap<>();
+        hardware.put("mac", String.join(",", macSet));
+        String canonical = MACHINE_CODE_VERSION + "|" + hardware.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .collect(Collectors.joining("|"));
+        return SHA.sha256(canonical);
     }
 
     /**
@@ -387,7 +447,7 @@ public class License {
      * <ul>
      *   <li>{@code appName}：必须完全相等；</li>
      *   <li>{@code appPort}：两侧均为空则视为通过，否则必须完全相等；</li>
-     *   <li>{@code machineCode}：必须与当前机器码完全相等（整字符串比较）。</li>
+     *   <li>{@code machineCode}：必须与当前机器的硬件摘要完全相等。</li>
      * </ul>
      * </p>
      *
@@ -426,7 +486,7 @@ public class License {
             throw new IllegalStateException("授权校验失败：机器码不匹配，请重新申请授权。");
         }
 
-        log.debug("verifyMachineInfo: passed. name=[{}], port=[{}], macs=[{}]", current.getAppName(), current.getAppPort(), currentCode);
+        log.debug("verifyMachineInfo: passed. name=[{}], port=[{}], machineCode=[{}]", current.getAppName(), current.getAppPort(), currentCode);
 
         // ---- 校验过期时间（为 null 表示永久有效）----
         Integer expiryDate = licenseInfo.getExpiryDate();
