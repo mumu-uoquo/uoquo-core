@@ -400,7 +400,12 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
             if (securityAesKey != null) {
                 return;
             }
-            String key = RedisUtil.get("security.aes.key", String.class);
+            String key = null;
+            try {
+                key = RedisUtil.get("security.aes.key", String.class);
+            } catch (Exception e) {
+                log.warn("从 Redis 获取AES秘钥失败：{}", e.getMessage());
+            }
             if (StringUtil.isNull(key)) {
                 key = Config.getString("app.security.aes.key", "");
             }
@@ -420,7 +425,12 @@ public class SensitiveSerializer extends JsonSerializer<String> implements Conte
             if (securityPrivateKey != null) {
                 return;
             }
-            String key = RedisUtil.get("security.rsa.private-key", String.class);
+            String key = null;
+            try {
+                key = RedisUtil.get("security.rsa.private-key", String.class);
+            } catch (Exception e) {
+                log.warn("从 Redis 获取RSA私钥失败：{}", e.getMessage());
+            }
             if (StringUtil.isNull(key)) {
                 key = Config.getString("app.security.rsa.private-key", "");
             }

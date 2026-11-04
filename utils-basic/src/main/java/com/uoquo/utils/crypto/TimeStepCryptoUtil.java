@@ -257,7 +257,12 @@ public class TimeStepCryptoUtil {
             if (securityTimeStep != null) {
                 return;
             }
-            Integer step = RedisUtil.get("security.aes.time-step", Integer.class);
+            Integer step = null;
+            try {
+                step = RedisUtil.get("security.aes.time-step", Integer.class);
+            } catch (Exception e) {
+                log.warn("从 Redis 获取时间片长度失败：{}", e.getMessage());
+            }
             if (step == null) {
                 step = Config.getInt("app.security.aes.time-step", 5);
             }
