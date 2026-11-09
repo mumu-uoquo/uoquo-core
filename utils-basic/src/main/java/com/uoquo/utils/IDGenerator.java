@@ -108,7 +108,7 @@ public class IDGenerator {
     /**
      * ULID 单例.
      */
-    private static ULID ulidInstance = null;
+    private static volatile ULID ulidInstance = null;
     private static ULID instanceUlid() {
         if (ulidInstance == null) {
             synchronized (IDGenerator.class) {

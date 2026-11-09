@@ -12,16 +12,20 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * 数据ID（推荐）
- * 优点：毫秒级时序，与数据中心无关。
- * 参考：<a href="https://www.likecs.com/show-308629867.html">https://www.likecs.com/show-308629867.html</a>
- * 标准：6 byte（时间戳 10889年） + 10 byte（随机数） ，共 16 byte（128 bit），转换为base32为 26 字符
- * 改造：5.5 byte（时间戳 2527年）+ 4.5 byte（随机数），共 10 byte（80  bit），转换为base32为 16 字符
+ * <br>优点：毫秒级时序，与数据中心无关。
+ * <br>参考：<a href="https://www.likecs.com/show-308629867.html">https://www.likecs.com/show-308629867.html</a>
+ * <br>标准：6 byte（时间戳 10889年） + 10 byte（随机数） ，共 16 byte（128 bit），转换为base32为 26 字符
+ * <br>改造：5.5 byte（时间戳 2527年）+ 4.5 byte（随机数），共 10 byte（80  bit），转换为base32为 16 字符
+ * <pre>
  * 补充：
  *   20251121：高位固定填1，防止生成字串为数字开头，可用时间将减半(16位：2248年，26位：无影响)
+ *   线程安全：nextId() / nextInt() 为同步方法，同一实例可被多线程共享，且在时钟回拨时仍保持递增。
+ *             nextId(Date) 不修改实例状态。toString()、getTimestamp()、equals() 等读取方法未加锁，仅用于单线程场景（如 parse 的结果）。
+ * </pre>
  */
 public class ULID  implements Comparable<ULID>{
 
@@ -29,6 +33,12 @@ public class ULID  implements Comparable<ULID>{
      * 生成的ID长度（目前只支持16和26）
      */
     private final int ULID_BYTE_LEN;
+
+    /**
+     * 时间戳（ms）的上限（不含）。
+     * 16位：高位固定填1，实际只有 43 bit 可用；26位：48 bit
+     */
+    private final long MAX_TIME;
     
     /**
      * Crockford Base32 编码表。
@@ -43,17 +53,33 @@ public class ULID  implements Comparable<ULID>{
         Arrays.fill(DECODE_ALPHABET, -1);
         for (int i = 0; i < ENCODE_ALPHABET.length; i++) {
             DECODE_ALPHABET[ENCODE_ALPHABET[i]] = i;
+            // 同时支持小写，解析时无需再 toUpperCase（避免受默认 Locale 影响）
+            DECODE_ALPHABET[Character.toLowerCase(ENCODE_ALPHABET[i])] = i;
         }
-        // Upper case OIL
+        // OIL（大小写均支持）
         DECODE_ALPHABET['O'] = 0x00;
+        DECODE_ALPHABET['o'] = 0x00;
         DECODE_ALPHABET['I'] = 0x01;
+        DECODE_ALPHABET['i'] = 0x01;
         DECODE_ALPHABET['L'] = 0x01;
+        DECODE_ALPHABET['l'] = 0x01;
     }
 
     /**
-     * 上一次时间戳（ms）
+     * nextId() 上一次使用的时间戳（ms），受 this 锁保护。
+     * 时钟回拨时以该值为准，保证 ID 不倒退。
      */
-    private final AtomicLong lastStamp = new AtomicLong(0);
+    private long lastStamp = 0;
+
+    /**
+     * nextInt() 上一次使用的时间窗口（ms，按步长对齐），受 this 锁保护。
+     */
+    private long lastIntStamp = 0;
+
+    /**
+     * nextInt() 当前窗口内的序列号（12 bit），受 this 锁保护。
+     */
+    private int intSeq = 0;
 
     /**
      * 高有效位
@@ -132,14 +158,19 @@ public class ULID  implements Comparable<ULID>{
      * 构造方法（仅支持 16 和 26）
      */
     public ULID(int len) {
+        if ((len != 16) && (len != 26)) {
+            throw new IllegalArgumentException("ULID length only supports 16 or 26, but was " + len);
+        }
         this.ULID_BYTE_LEN = len;
         // 初始数据
         if (ULID_BYTE_LEN == 16) {
             TIME_BIT_LEN   = 44; // 5.5 byte
+            MAX_TIME = 1L << 43; // 最高位固定填1，占用了1 bit
             RANDOM_MSB_BIT_LEN = 0;
             RANDOM_LSB_BIT_LEN = 36; // 4.5 byte
         } else {
             TIME_BIT_LEN   = 48; // 6  byte
+            MAX_TIME = 1L << 48;
             RANDOM_MSB_BIT_LEN = 16;
             RANDOM_LSB_BIT_LEN = 64; // RANDOM_MSB_BIT_LEN + RANDOM_LSB_BIT_LEN = 10 byte
         }
@@ -173,26 +204,41 @@ public class ULID  implements Comparable<ULID>{
      * 获取下一个ID值
      * 效率：每毫秒约2200个
      */
-    public String nextId() {
-        long time = this.getThisTime(1);
-        if ((time != lastStamp.get()) || (this.lsb == 0)) {
+    public synchronized String nextId() {
+        // 时钟回拨时，沿用上一次的时间戳，保证ID不倒退
+        long time = Math.max(this.getThisTime(1), this.lastStamp);
+        if (time != this.lastStamp) {
             // 不同毫秒，则获取不同随机数
             this.generateData(time);
+            this.lastStamp = time;
         } else {
             // 相同毫秒，随机数加1（用于保证时序）
             this.lsb += 1;
         }
         // 随机位过大时，等待下一毫秒
-        if ((this.lsb & LSB_MASK) == LSB_MASK) {
-            this.generateData(this.getNextTime(1));
+        while ((this.lsb & LSB_MASK) == LSB_MASK) {
+            time = this.getNextTime(1, this.lastStamp);
+            this.generateData(time);
+            this.lastStamp = time;
         }
-        return (ULID_BYTE_LEN == 16) ? toString4Len16() : toString4Len26();
+        return this.encode(this.msb, this.lsb);
     }
 
+    /**
+     * 获取指定时间的ID值.
+     * <br>不会修改当前实例的状态，因此不影响 {@link #nextId()} 的时序。
+     * @throws IllegalArgumentException 时间超出可表示的范围（16位：[0, 2^43)ms，26位：[0, 2^48)ms）
+     */
     public String nextId(Date date) {
         long time = date.getTime();
-        this.generateData(time);
-        return (ULID_BYTE_LEN == 16) ? toString4Len16() : toString4Len26();
+        if (time < 0 || time >= MAX_TIME) {
+            throw new IllegalArgumentException("Timestamp out of range for ULID(" + ULID_BYTE_LEN + "): " + time);
+        }
+        return this.encode(this.buildMsb(time), this.generateRandomness() & LSB_MASK);
+    }
+
+    private String encode(long hi, long lo) {
+        return (ULID_BYTE_LEN == 16) ? toString4Len16(hi, lo) : toString4Len26(hi, lo);
     }
 
     /**
@@ -200,20 +246,23 @@ public class ULID  implements Comparable<ULID>{
      * 效率：每毫秒约4个（目前按500毫秒一组数据）
      * 注：72H内不会重复，否则有重复风险
      */
-    public int nextInt() {
+    public synchronized int nextInt() {
         int step = 500; // 每500ms作为一组
-        long time = this.getThisTime(step);
-        if ((time != lastStamp.get()) || (this.lsb == 0)) {
-            // 不同毫秒，则获取不同随机数
-            this.generateData(time);
+        // 时钟回拨时，沿用上一次的时间窗口，保证不倒退
+        long time = Math.max(this.getThisTime(step), this.lastIntStamp);
+        if (time != this.lastIntStamp) {
+            // 不同窗口，则获取不同随机数
+            this.lastIntStamp = time;
+            this.intSeq = (int) (this.generateRandomness() & INT_LSB_MASK);
         } else {
-            // 相同毫秒，随机数加1（用于保证时序）
-            this.lsb += 1;
+            // 相同窗口，序列号加1（用于保证时序）
+            this.intSeq += 1;
         }
-        // 随机位过大时，等待下一毫秒
-        if ((this.lsb & INT_LSB_MASK) == INT_LSB_MASK) {
-            time = this.getNextTime(step);
-            this.generateData(time);
+        // 序列号过大时，等待下一个窗口
+        while (this.intSeq >= INT_LSB_MASK) {
+            time = this.getNextTime(step, this.lastIntStamp);
+            this.lastIntStamp = time;
+            this.intSeq = (int) (this.generateRandomness() & INT_LSB_MASK);
         }
         // 拼接整数
         int r = 0;
@@ -221,16 +270,23 @@ public class ULID  implements Comparable<ULID>{
         r |= (int) ((time / step) & 0x7FFFF);
         r <<= 12;
         // 随机数
-        r |= (int) (this.lsb & 0xFFF);
+        r |= this.intSeq;
         return r;
     }
 
     /**
-     * 获取下一毫秒的数值.
+     * 获取下一个时间窗口的数值（必须大于 last）.
+     * @param step 窗口步长（ms）
+     * @param last 上一次使用的时间戳
      */
-    private long getNextTime(int step) {
+    private long getNextTime(int step, long last) {
         long mill = getThisTime(step);
-        while (mill <= lastStamp.get()) {
+        while (mill <= last) {
+            if (step > 1) {
+                LockSupport.parkNanos(200_000L);
+            } else {
+                Thread.onSpinWait();
+            }
             mill = getThisTime(step);
         }
         return mill;
@@ -250,16 +306,21 @@ public class ULID  implements Comparable<ULID>{
      * 生成指定时间戳的数据
      */
     private void generateData(long time) {
-        lastStamp.set(time);
+        this.msb = this.buildMsb(time);
+        // 仅保留有效位（16位ID只用低36 bit），保证与 parse 的结果一致
+        this.lsb = generateRandomness() & LSB_MASK;
+    }
+
+    /**
+     * 构造高有效位：时间戳（+ 26位ID时的16 bit随机数）
+     */
+    private long buildMsb(long time) {
         if (ULID_BYTE_LEN == 16) {
             // 20 = Long.BYTES - TIME_BIT_LEN; // 64 - 44
-            this.msb = time << timeBitLeftMoveLen;
-        } else {
-            long random = generateRandomness();
-            // 16 = Long.BYTES - TIME_BIT_LEN; // 64 - 48
-            this.msb = (time << timeBitLeftMoveLen) | (random & 0xFFFFL);
+            return time << timeBitLeftMoveLen;
         }
-        this.lsb = generateRandomness();
+        // 16 = Long.BYTES - TIME_BIT_LEN; // 64 - 48
+        return (time << timeBitLeftMoveLen) | (generateRandomness() & 0xFFFFL);
     }
 
     /**
@@ -273,20 +334,20 @@ public class ULID  implements Comparable<ULID>{
      * 将生成的ID转换为可读字符串
      * 备注：仅适用于生成16字符，性能较好
      */
-    private String toString4Len16() {
+    private String toString4Len16(long hi, long lo) {
         byte[] bytes = new byte[16];
         int idx = bytes.length;
         // 1. 拼接随机串
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb        & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>>  5 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 10 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 15 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 20 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 25 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 30 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo        & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>>  5 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 10 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 15 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 20 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 25 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 30 & 0x1F)];
         // 2. 拼接中间1字节（ttttr：时间戳的 0 ~ 3 bit 与随机数的第 35 bit）
-        long msb = this.msb >>> 20;
-        long mdl = ((msb & 0x0F) << 1) | (this.lsb >>> 35 & 0x01);
+        long msb = hi >>> 20;
+        long mdl = ((msb & 0x0F) << 1) | (lo >>> 35 & 0x01);
         bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (mdl & 0x1F)];
         // 3. 拼接时间戳
         bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (msb >>>  4 & 0x1F)];
@@ -304,27 +365,27 @@ public class ULID  implements Comparable<ULID>{
 
     /**
      * 将生成的ID转换为可读字符串
-     * 备注：仅适用于生成16字符，性能较好
+     * 备注：仅适用于生成26字符，性能较好
      */
-    private String toString4Len26() {
+    private String toString4Len26(long hi, long lo) {
         byte[] bytes = new byte[26];
         int idx = bytes.length;
         // 1. 拼接随机串
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb        & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>>  5 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 10 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 15 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 20 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 25 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 30 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 35 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 40 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 45 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 50 & 0x1F)];
-        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (this.lsb >>> 55 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo        & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>>  5 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 10 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 15 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 20 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 25 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 30 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 35 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 40 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 45 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 50 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 55 & 0x1F)];
         // 2. 拼接中间1字节（trrrr：时间戳的第 0 bit 与随机数的 60 ~ 63 bit）
-        long msb = this.msb;
-        long mdl = ((msb & 0x01) << 4) | (this.lsb >>> 60 & 0x0F);
+        long msb = hi;
+        long mdl = ((msb & 0x01) << 4) | (lo >>> 60 & 0x0F);
         bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (mdl & 0x1F)];
         // 3. 拼接高位字串
         // 3.1 拼接随机串
@@ -373,16 +434,16 @@ public class ULID  implements Comparable<ULID>{
     public static ULID parse(String value) {
         // 字符串长度判断
         if (Objects.isNull(value)) {
-            throw new IllegalArgumentException("Invalid length of ULID");
+            throw new IllegalArgumentException("ULID must not be null");
         }
         int len = value.length();
         if ((len != 16) && (len != 26)) {
             throw new IllegalArgumentException("Invalid length of ULID");
         }
-        // 字符有效性判断
-        char[] chars = value.toUpperCase().toCharArray();
+        // 字符有效性判断（码表已包含大小写，非 ASCII 字符直接判为非法）
+        char[] chars = value.toCharArray();
         for (char c : chars) {
-            if (DECODE_ALPHABET[c] == -1) {
+            if ((c >= DECODE_ALPHABET.length) || (DECODE_ALPHABET[c] == -1)) {
                 throw new IllegalArgumentException("Invalid ULID canonical string for char '" + c + "'");
             }
         }
@@ -391,8 +452,8 @@ public class ULID  implements Comparable<ULID>{
         if (len == 16) {
             long timestamp  = decodeBase32(0, 0, 9, 40, DECODE_ALPHABET, chars);
             long randomness = decodeBase32(0, 9, 16, 30, DECODE_ALPHABET, chars);
-            // 需将高位补填的1去掉
-            ulid.msb = (timestamp & 0x7FFFFFFFFFEL) << 19;
+            // 需将高位补填的1去掉：timestamp 的第 0 bit 属于随机数，第 1 ~ 43 bit 为时间戳，第 44 bit 为补填的1
+            ulid.msb = (timestamp & 0xFFFFFFFFFFEL) << 19;
             ulid.lsb = ((timestamp & 0x1) << 35) | randomness;
         } else {
             long timestamp = decodeBase32(0, 0, 10, 45, DECODE_ALPHABET, chars);
@@ -473,8 +534,9 @@ public class ULID  implements Comparable<ULID>{
 
     @Override
     public int compareTo(ULID ulid) {
-        int msbFlag = Long.compare(this.msb, ulid.msb);
-        return msbFlag != 0 ? msbFlag : Long.compare(this.lsb, ulid.lsb);
+        // 按无符号比较，保证与字符串的字典序一致（26位ID的 lsb 最高位可能为1）
+        int msbFlag = Long.compareUnsigned(this.msb, ulid.msb);
+        return msbFlag != 0 ? msbFlag : Long.compareUnsigned(this.lsb, ulid.lsb);
     }
 
     @Override
