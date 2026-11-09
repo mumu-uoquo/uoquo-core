@@ -7,11 +7,11 @@ package com.uoquo.utils.crypto;
 import com.uoquo.utils.DateUtil;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -23,6 +23,10 @@ import java.util.concurrent.locks.LockSupport;
  * <pre>
  * 补充：
  *   20251121：高位固定填1，防止生成字串为数字开头，可用时间将减半(16位：2248年，26位：无影响)
+ *   随机源：使用 {@link SecureRandom}（不可预测）。同一毫秒内，随机数按随机步长递增（而非固定+1），
+ *           既保证时序，又避免由一个ID推算出相邻ID。
+ *   首字符：16位和26位的首字符均为字母（16位：G ~ Z，26位：G ~ Q），不会以数字开头。
+ *   熵：16位仅有 36 bit 随机数，26位有 80 bit 随机数。时间戳部分不属于保密信息。
  *   线程安全：nextId() / nextInt() 为同步方法，同一实例可被多线程共享，且在时钟回拨时仍保持递增。
  *             nextId(Date) 不修改实例状态。toString()、getTimestamp()、equals() 等读取方法未加锁，仅用于单线程场景（如 parse 的结果）。
  * </pre>
@@ -39,7 +43,13 @@ public class ULID  implements Comparable<ULID>{
      * 16位：高位固定填1，实际只有 43 bit 可用；26位：48 bit
      */
     private final long MAX_TIME;
-    
+
+    /**
+     * 同一毫秒内，随机数递增步长的掩码（步长范围为 [1, STEP_MASK + 1]）。
+     * 16位：2^20（每毫秒平均可容纳约6万个ID，高于单线程生成速度）；26位：2^32
+     */
+    private final long STEP_MASK;
+
     /**
      * Crockford Base32 编码表。
      */
@@ -111,7 +121,7 @@ public class ULID  implements Comparable<ULID>{
     private int RANDOM_LSB_BIT_LEN;
 
     /**
-     * 低有效位的最大值（用于判断是否需要等待下一毫秒）
+     * 低有效位的最大值（用于判断随机空间是否耗尽，耗尽后需等待下一毫秒）
      */
     private long LSB_MASK;
 
@@ -166,11 +176,13 @@ public class ULID  implements Comparable<ULID>{
         if (ULID_BYTE_LEN == 16) {
             TIME_BIT_LEN   = 44; // 5.5 byte
             MAX_TIME = 1L << 43; // 最高位固定填1，占用了1 bit
+            STEP_MASK = (1L << 20) - 1;
             RANDOM_MSB_BIT_LEN = 0;
             RANDOM_LSB_BIT_LEN = 36; // 4.5 byte
         } else {
             TIME_BIT_LEN   = 48; // 6  byte
             MAX_TIME = 1L << 48;
+            STEP_MASK = (1L << 32) - 1;
             RANDOM_MSB_BIT_LEN = 16;
             RANDOM_LSB_BIT_LEN = 64; // RANDOM_MSB_BIT_LEN + RANDOM_LSB_BIT_LEN = 10 byte
         }
@@ -212,14 +224,18 @@ public class ULID  implements Comparable<ULID>{
             this.generateData(time);
             this.lastStamp = time;
         } else {
-            // 相同毫秒，随机数加1（用于保证时序）
-            this.lsb += 1;
-        }
-        // 随机位过大时，等待下一毫秒
-        while ((this.lsb & LSB_MASK) == LSB_MASK) {
-            time = this.getNextTime(1, this.lastStamp);
-            this.generateData(time);
-            this.lastStamp = time;
+            // 相同毫秒，随机数增加一个随机步长（用于保证时序，同时避免相邻ID可被推算）
+            long step = this.nextStep();
+            // 剩余空间（无符号数，lsb 始终不超过 LSB_MASK）
+            long room = LSB_MASK - this.lsb;
+            if (Long.compareUnsigned(step, room) <= 0) {
+                this.lsb += step;
+            } else {
+                // 本毫秒的随机空间已耗尽，等待下一毫秒
+                time = this.getNextTime(1, this.lastStamp);
+                this.generateData(time);
+                this.lastStamp = time;
+            }
         }
         return this.encode(this.msb, this.lsb);
     }
@@ -320,14 +336,56 @@ public class ULID  implements Comparable<ULID>{
             return time << timeBitLeftMoveLen;
         }
         // 16 = Long.BYTES - TIME_BIT_LEN; // 64 - 48
-        return (time << timeBitLeftMoveLen) | (generateRandomness() & 0xFFFFL);
+        return (time << timeBitLeftMoveLen) | (SecureRandomPool.nextInt() & 0xFFFFL);
     }
 
     /**
-     * 生成随机数（可使用UUID等的随机数）
+     * 生成随机数（密码学安全）
      */
     private long generateRandomness() {
-        return ThreadLocalRandom.current().nextLong();
+        return SecureRandomPool.nextLong();
+    }
+
+    /**
+     * 生成同一毫秒内的随机递增步长，范围 [1, STEP_MASK + 1]
+     */
+    private long nextStep() {
+        return (SecureRandomPool.nextInt() & STEP_MASK) + 1;
+    }
+
+    /**
+     * 安全随机数缓冲池.
+     * <br>每次从 {@link SecureRandom} 批量取一批随机字节，再逐段消费，避免每个ID都产生一次 SecureRandom 调用的开销。
+     * 已消费的字节会立即清零。
+     */
+    private static final class SecureRandomPool {
+        private static final SecureRandom RANDOM = new SecureRandom();
+        private static final byte[] BUF = new byte[1024];
+        private static int pos = BUF.length;
+
+        private static synchronized long take(int n) {
+            if (pos + n > BUF.length) {
+                RANDOM.nextBytes(BUF);
+                pos = 0;
+            }
+            long v = 0;
+            for (int i = 0; i < n; i++) {
+                v = (v << 8) | (BUF[pos + i] & 0xFFL);
+                BUF[pos + i] = 0;
+            }
+            pos += n;
+            return v;
+        }
+
+        /** 返回 64 bit 随机数 */
+        static long nextLong() {
+            return take(8);
+        }
+
+        /** 返回 32 bit 随机数（无符号，0 ~ 2^32-1） */
+        static long nextInt() {
+            return take(4);
+        }
     }
 
     /**
@@ -383,7 +441,7 @@ public class ULID  implements Comparable<ULID>{
         bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 45 & 0x1F)];
         bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 50 & 0x1F)];
         bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 55 & 0x1F)];
-        // 2. 拼接中间1字节（trrrr：时间戳的第 0 bit 与随机数的 60 ~ 63 bit）
+        // 2. 拼接中间1字节（trrrr：随机数的第 0 bit 与随机数的 60 ~ 63 bit）
         long msb = hi;
         long mdl = ((msb & 0x01) << 4) | (lo >>> 60 & 0x0F);
         bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (mdl & 0x1F)];
