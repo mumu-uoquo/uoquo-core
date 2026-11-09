@@ -21,12 +21,17 @@ import java.util.concurrent.locks.LockSupport;
  * <br>标准：6 byte（时间戳 10889年） + 10 byte（随机数） ，共 16 byte（128 bit），转换为base32为 26 字符
  * <br>改造：5.5 byte（时间戳 2527年）+ 4.5 byte（随机数），共 10 byte（80  bit），转换为base32为 16 字符
  * <pre>
+ * 三种长度对比（时间戳均为毫秒，自 1970 起算）：
+ *   长度  时间位  可用至        随机位  说明
+ *   16    43      2248-09-26    36      最短，随机位较少，适合对不可枚举性要求不高的场景
+ *   20    44      2527-06-23    55      折中（推荐）：位对齐（11个字符随机数 + 9个字符时间戳）
+ *   26    48      10889-08-02   80      随机位最多
  * 补充：
- *   20251121：高位固定填1，防止生成字串为数字开头，可用时间将减半(16位：2248年，26位：无影响)
+ *   20251121：高位固定填1，防止生成字串为数字开头，可用时间将减半(16位：2248年，20位和26位：无影响)
  *   随机源：使用 {@link SecureRandom}（不可预测）。同一毫秒内，随机数按随机步长递增（而非固定+1），
  *           既保证时序，又避免由一个ID推算出相邻ID。
- *   首字符：16位和26位的首字符均为字母（16位：G ~ Z，26位：G ~ Q），不会以数字开头。
- *   熵：16位仅有 36 bit 随机数，26位有 80 bit 随机数。时间戳部分不属于保密信息。
+ *   首字符：16位和20位的首字符为 G ~ Z，26位为 G ~ Q，均为字母，不会以数字开头。
+ *   熵：16位有 36 bit 随机数，20位有 55 bit，26位有 80 bit。时间戳部分不属于保密信息。
  *   线程安全：nextId() / nextInt() 为同步方法，同一实例可被多线程共享，且在时钟回拨时仍保持递增。
  *             nextId(Date) 不修改实例状态。toString()、getTimestamp()、equals() 等读取方法未加锁，仅用于单线程场景（如 parse 的结果）。
  * </pre>
@@ -34,19 +39,19 @@ import java.util.concurrent.locks.LockSupport;
 public class ULID  implements Comparable<ULID>{
 
     /**
-     * 生成的ID长度（目前只支持16和26）
+     * 生成的ID长度（目前只支持16、20和26）
      */
     private final int ULID_BYTE_LEN;
 
     /**
      * 时间戳（ms）的上限（不含）。
-     * 16位：高位固定填1，实际只有 43 bit 可用；26位：48 bit
+     * 16位：高位固定填1，实际只有 43 bit 可用；20位：44 bit（固定填的1是独立的第100 bit）；26位：48 bit
      */
     private final long MAX_TIME;
 
     /**
      * 同一毫秒内，随机数递增步长的掩码（步长范围为 [1, STEP_MASK + 1]）。
-     * 16位：2^20（每毫秒平均可容纳约6万个ID，高于单线程生成速度）；26位：2^32
+     * 16位：2^20（每毫秒平均可容纳约6万个ID，高于单线程生成速度）；20位：2^24；26位：2^32
      */
     private final long STEP_MASK;
 
@@ -93,7 +98,7 @@ public class ULID  implements Comparable<ULID>{
 
     /**
      * 高有效位
-     * 当ID长度为16时：高44 bit为时间戳
+     * 当ID长度为16或20时：高44 bit为时间戳（16位时最高位在字符串中被固定填1）
      * 当ID长度为26时：高48 bit为时间戳，低16 bit为随机数
      */
     private long msb;
@@ -101,6 +106,7 @@ public class ULID  implements Comparable<ULID>{
     /**
      * 低有效位
      * 当ID长度为16时：仅低36 bit有效
+     * 当ID长度为20时：仅低55 bit有效
      * 当ID长度为26时：所有64 bit有效
      */
     private long lsb;
@@ -158,18 +164,18 @@ public class ULID  implements Comparable<ULID>{
     private long msbModMaxVal;
 
     /**
-     * 构造方法（默认 16 字符长度）
+     * 构造方法（默认 20 字符长度）
      */
     public ULID() {
-        this(16);
+        this(20);
     }
 
     /**
-     * 构造方法（仅支持 16 和 26）
+     * 构造方法（仅支持 16、20 和 26）
      */
     public ULID(int len) {
-        if ((len != 16) && (len != 26)) {
-            throw new IllegalArgumentException("ULID length only supports 16 or 26, but was " + len);
+        if ((len != 16) && (len != 20) && (len != 26)) {
+            throw new IllegalArgumentException("ULID length only supports 16, 20 or 26, but was " + len);
         }
         this.ULID_BYTE_LEN = len;
         // 初始数据
@@ -179,6 +185,13 @@ public class ULID  implements Comparable<ULID>{
             STEP_MASK = (1L << 20) - 1;
             RANDOM_MSB_BIT_LEN = 0;
             RANDOM_LSB_BIT_LEN = 36; // 4.5 byte
+        } else if (ULID_BYTE_LEN == 20) {
+            // 共100 bit：1 bit固定填1 + 44 bit时间戳 + 55 bit随机数，随机数正好占11个字符
+            TIME_BIT_LEN   = 44;
+            MAX_TIME = 1L << 44;
+            STEP_MASK = (1L << 24) - 1;
+            RANDOM_MSB_BIT_LEN = 0;
+            RANDOM_LSB_BIT_LEN = 55;
         } else {
             TIME_BIT_LEN   = 48; // 6  byte
             MAX_TIME = 1L << 48;
@@ -198,7 +211,8 @@ public class ULID  implements Comparable<ULID>{
         lsbOffset  = ULID_BYTE_LEN - lsbByteLen;
         // 最低有效位中多余 bit 的标记
         lsbModBitLen = RANDOM_LSB_BIT_LEN % 5;
-        lsbModMaxVal = -1L >>> (Long.BYTES * 8 - lsbModBitLen);
+        // 注意：不能写成 -1L >>> (64 - lsbModBitLen)，当 lsbModBitLen 为 0（20位）时移位 64 位等于不移位
+        lsbModMaxVal = (1L << lsbModBitLen) - 1;
         lsbModBitRightMoveLen = RANDOM_LSB_BIT_LEN - lsbModBitLen; // RANDOM_LSB_BIT_LEN / 5 * 5
         // ID串中，中间拼接MSB和LSB的那一个字节
         mdlByteLen = 1;
@@ -207,7 +221,7 @@ public class ULID  implements Comparable<ULID>{
         msbByteLen   = ULID_BYTE_LEN - mdlByteLen - lsbByteLen;
         // 最高有效位中需要与最低有效位多余bit构成一个字节的内容
         msbModBitLen = 5 - lsbModBitLen;
-        msbModMaxVal = -1L >>> (Long.BYTES * 8  - msbModBitLen);
+        msbModMaxVal = (1L << msbModBitLen) - 1;
         // 高有效为中有效数据需右移的长度
         msbBitRightMoveLen = Long.BYTES * 8 - TIME_BIT_LEN - RANDOM_MSB_BIT_LEN;
     }
@@ -254,7 +268,11 @@ public class ULID  implements Comparable<ULID>{
     }
 
     private String encode(long hi, long lo) {
-        return (ULID_BYTE_LEN == 16) ? toString4Len16(hi, lo) : toString4Len26(hi, lo);
+        switch (ULID_BYTE_LEN) {
+            case 16: return toString4Len16(hi, lo);
+            case 20: return toString4Len20(hi, lo);
+            default: return toString4Len26(hi, lo);
+        }
     }
 
     /**
@@ -331,8 +349,8 @@ public class ULID  implements Comparable<ULID>{
      * 构造高有效位：时间戳（+ 26位ID时的16 bit随机数）
      */
     private long buildMsb(long time) {
-        if (ULID_BYTE_LEN == 16) {
-            // 20 = Long.BYTES - TIME_BIT_LEN; // 64 - 44
+        if (ULID_BYTE_LEN != 26) {
+            // 16位和20位：20 = Long.BYTES - TIME_BIT_LEN; // 64 - 44
             return time << timeBitLeftMoveLen;
         }
         // 16 = Long.BYTES - TIME_BIT_LEN; // 64 - 48
@@ -423,6 +441,42 @@ public class ULID  implements Comparable<ULID>{
 
     /**
      * 将生成的ID转换为可读字符串
+     * 备注：仅适用于生成20字符，性能较好
+     * <br>布局（共100 bit，从低位到高位）：55 bit随机数（11个字符） + 44 bit时间戳 + 1 bit固定填1（共9个字符）
+     */
+    private String toString4Len20(long hi, long lo) {
+        byte[] bytes = new byte[20];
+        int idx = bytes.length;
+        // 1. 拼接随机串（55 bit，11个字符）
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo        & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>>  5 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 10 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 15 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 20 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 25 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 30 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 35 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 40 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 45 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (lo >>> 50 & 0x1F)];
+        // 2. 拼接时间戳（44 bit）
+        long time = hi >>> 20;
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time        & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>>  5 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>> 10 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>> 15 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>> 20 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>> 25 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>> 30 & 0x1F)];
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>> 35 & 0x1F)];
+        // 高位填1，防止生成的字符串为数字开头（时间戳剩余4 bit + 固定的1 bit）
+        bytes[--idx] = (byte) ULID.ENCODE_ALPHABET[(int) (time >>> 40 & 0x0F | 0x10)];
+        // 3. 转换为字符串
+        return new String(bytes, StandardCharsets.US_ASCII);
+    }
+
+    /**
+     * 将生成的ID转换为可读字符串
      * 备注：仅适用于生成26字符，性能较好
      */
     private String toString4Len26(long hi, long lo) {
@@ -495,7 +549,7 @@ public class ULID  implements Comparable<ULID>{
             throw new IllegalArgumentException("ULID must not be null");
         }
         int len = value.length();
-        if ((len != 16) && (len != 26)) {
+        if ((len != 16) && (len != 20) && (len != 26)) {
             throw new IllegalArgumentException("Invalid length of ULID");
         }
         // 字符有效性判断（码表已包含大小写，非 ASCII 字符直接判为非法）
@@ -513,6 +567,13 @@ public class ULID  implements Comparable<ULID>{
             // 需将高位补填的1去掉：timestamp 的第 0 bit 属于随机数，第 1 ~ 43 bit 为时间戳，第 44 bit 为补填的1
             ulid.msb = (timestamp & 0xFFFFFFFFFFEL) << 19;
             ulid.lsb = ((timestamp & 0x1) << 35) | randomness;
+        } else if (len == 20) {
+            // 前9个字符为：固定的1(1 bit) + 时间戳(44 bit)；后11个字符为随机数(55 bit)
+            long timestamp  = decodeBase32(0, 0, 9, 40, DECODE_ALPHABET, chars);
+            long randomness = decodeBase32(0, 9, 20, 50, DECODE_ALPHABET, chars);
+            // 需将高位补填的1去掉
+            ulid.msb = (timestamp & 0xFFFFFFFFFFFL) << 20;
+            ulid.lsb = randomness;
         } else {
             long timestamp = decodeBase32(0, 0, 10, 45, DECODE_ALPHABET, chars);
             long highRandomness = decodeBase32(0, 10, 14, 15, DECODE_ALPHABET, chars);

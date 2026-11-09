@@ -63,6 +63,12 @@ public class IdTest {
         System.out.println(ulid2.toString());
         System.out.println(ulid2.getYearAndMonth());
 
+        ulid = new ULID(20);
+        System.out.println(ulid.nextId());
+        ulid2 = ULID.parse(ulid.toString());
+        System.out.println(ulid2.toString());
+        System.out.println(ulid2.getYearAndMonth());
+
         ulid = new ULID(26);
         System.out.println(ulid.nextId());
         ulid2 = ULID.parse(ulid.toString());

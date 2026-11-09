@@ -113,7 +113,7 @@ public class IDGenerator {
         if (ulidInstance == null) {
             synchronized (IDGenerator.class) {
                 if (ulidInstance == null) {
-                    ulidInstance = new ULID(16);
+                    ulidInstance = new ULID(20);
                 }
             }
         }
@@ -136,7 +136,7 @@ public class IDGenerator {
             return instanceUlid().nextId();
         } else {
             // 每次新建对象，防止污染单例的属性
-            return new ULID(16).nextId(date);
+            return new ULID(20).nextId(date);
         }
     }
 }
