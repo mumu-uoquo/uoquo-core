@@ -11,22 +11,36 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import javax.imageio.ImageIO;
+
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.Binarizer;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
 import com.google.zxing.EncodeHintType;
+import com.google.zxing.LuminanceSource;
+import com.google.zxing.MultiFormatReader;
 import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.Result;
 import com.google.zxing.WriterException;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.common.GlobalHistogramBinarizer;
+import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 
 /**
  * 描述：条码工具类. <br>
- * 背景：使用ZXing，生成条码. <br>
+ * 背景：使用ZXing，生成与解析条码. <br>
  * 日期：2019-06-04 19:17 <br>
  * 说明：
  * <ul>
@@ -41,7 +55,8 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
  * --------     ----------     ------------     -----------------------
  * 1.0          2019-06-04     Administrator.           创建
  * 1.1          2026-11-10     uoquo team       修复EAN-13校验位与文字位置；文字改为绘制在条码下方；
- *                                              异常改为非受检异常；QR增加纠错等级与边距设置
+ *                                              异常改为非受检异常；QR增加纠错等级与边距设置；
+ *                                              增加条码图像解析方法decode（UPC-A补前导0）、decodeRaw（原始内容）
  * </pre>
  * @since   JDK 1.8
  * @version 1.1
@@ -87,12 +102,21 @@ public class BarcodeUtil {
     /** QR码编码参数（只读）. */
     private static final Map<EncodeHintType, Object> QR_HINTS;
 
+    /** 条码解析参数（只读）. */
+    private static final Map<DecodeHintType, Object> DECODE_HINTS;
+
     static {
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
         hints.put(EncodeHintType.CHARACTER_SET, CHARSET);
         hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
         hints.put(EncodeHintType.MARGIN, QR_MARGIN);
         QR_HINTS = Collections.unmodifiableMap(hints);
+
+        Map<DecodeHintType, Object> decodeHints = new EnumMap<>(DecodeHintType.class);
+        decodeHints.put(DecodeHintType.CHARACTER_SET, CHARSET);
+        decodeHints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+        decodeHints.put(DecodeHintType.ALSO_INVERTED, Boolean.TRUE);
+        DECODE_HINTS = Collections.unmodifiableMap(decodeHints);
     }
 
     /**
@@ -213,6 +237,106 @@ public class BarcodeUtil {
     }
 
     /**
+     * 解析条码图像，返回条码内容.<br>
+     * 支持ZXing可识别的一维码与二维码（含EAN-13、ITF、CODE_128、QR_CODE），自动识别格式，
+     * 并尝试反色图像. 图像中包含多个条码时只返回其中一个.<br>
+     * <b>注意：</b>以0开头的EAN-13，ZXing会识别为UPC-A并返回12位内容. 本方法会给UPC-A补回前导0，
+     * 统一返回13位，与{@link #generateEAN13}的输入保持一致. 因此真正的UPC-A条码（北美商品码）
+     * 也会返回13位，如需原始的12位内容，请使用{@link #decodeRaw(BufferedImage)}.
+     * @param image 条码图像
+     * @return 条码内容；图像中未识别到条码时返回null
+     * @throws IllegalArgumentException 图像为空
+     */
+    public static String decode(BufferedImage image) {
+        return decode(image, true);
+    }
+
+    /**
+     * 解析条码图像流，返回条码内容（UPC-A补前导0，规则同{@link #decode(BufferedImage)}）.
+     * 流由调用方负责关闭.
+     * @param in 图像输入流（PNG、JPEG、GIF、BMP等ImageIO支持的格式）
+     * @return 条码内容；图像中未识别到条码时返回null
+     * @throws IllegalArgumentException 输入流为空，或不是可识别的图像格式
+     * @throws BarcodeException         读取图像失败
+     */
+    public static String decode(InputStream in) {
+        return decode(readImage(in), true);
+    }
+
+    /**
+     * 解析条码图像，返回ZXing识别出的原始内容，<b>不</b>给UPC-A补前导0（其余规则同{@link #decode(BufferedImage)}）.<br>
+     * 适用于需要12位UPC-A内容的场景. 注意：以0开头的EAN-13也会被识别为UPC-A，返回12位.
+     * @param image 条码图像
+     * @return 条码原始内容；图像中未识别到条码时返回null
+     * @throws IllegalArgumentException 图像为空
+     */
+    public static String decodeRaw(BufferedImage image) {
+        return decode(image, false);
+    }
+
+    /**
+     * 解析条码图像流，返回ZXing识别出的原始内容，不给UPC-A补前导0，规则同{@link #decodeRaw(BufferedImage)}.
+     * 流由调用方负责关闭.
+     * @param in 图像输入流
+     * @return 条码原始内容；图像中未识别到条码时返回null
+     * @throws IllegalArgumentException 输入流为空，或不是可识别的图像格式
+     * @throws BarcodeException         读取图像失败
+     */
+    public static String decodeRaw(InputStream in) {
+        return decode(readImage(in), false);
+    }
+
+    /**
+     * 解析条码图像.
+     * @param padUPCA 是否给UPC-A内容补前导0（转为EAN-13的13位形式）
+     */
+    private static String decode(BufferedImage image, boolean padUPCA) {
+        if (image == null) {
+            throw new IllegalArgumentException("条码图像必填.");
+        }
+        LuminanceSource source = new BufferedImageLuminanceSource(image);
+        // 先用局部自适应二值化（抗光照不均），失败再用全局直方图二值化（对清晰的生成图更稳）
+        Result result = tryDecode(new HybridBinarizer(source));
+        if (result == null) {
+            result = tryDecode(new GlobalHistogramBinarizer(source));
+        }
+        if (result == null) {
+            return null;
+        }
+        String text = result.getText();
+        return padUPCA && result.getBarcodeFormat() == BarcodeFormat.UPC_A ? "0" + text : text;
+    }
+
+    /** 读取图像流. */
+    private static BufferedImage readImage(InputStream in) {
+        if (in == null) {
+            throw new IllegalArgumentException("条码图像流必填.");
+        }
+        BufferedImage image;
+        try {
+            image = ImageIO.read(in);
+        } catch (IOException e) {
+            throw new BarcodeException("读取条码图像错误.", e);
+        }
+        if (image == null) {
+            throw new IllegalArgumentException("不支持的图像格式.");
+        }
+        return image;
+    }
+
+    /**
+     * 使用指定的二值化方式解码，未识别到条码时返回null.<br>
+     * MultiFormatReader带状态（hints），非线程安全，因此每次新建.
+     */
+    private static Result tryDecode(Binarizer binarizer) {
+        try {
+            return new MultiFormatReader().decode(new BinaryBitmap(binarizer), DECODE_HINTS);
+        } catch (NotFoundException e) {
+            return null;
+        }
+    }
+
+    /**
      * 生成带底部文本（文本内容即条码内容）的一维码.
      * @param code   条码字符
      * @param format 条码格式
@@ -249,7 +373,7 @@ public class BarcodeUtil {
     /**
      * 校验并规范化EAN-13内容，返回13位（含校验位）的数字串.
      */
-    private static String normalizeEAN13(String code) {
+    public static String normalizeEAN13(String code) {
         if (StringUtil.isNull(code)) {
             throw new IllegalArgumentException("条码内容必填.");
         }
@@ -265,6 +389,7 @@ public class BarcodeUtil {
             }
             return code;
         }
+        // 不足12位，前导补0
         String body = String.format("%12s", code).replace(' ', '0');
         return body + calcEAN13Checksum(body);
     }
