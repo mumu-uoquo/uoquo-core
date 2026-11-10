@@ -67,6 +67,9 @@ public class GlobalInterceptor implements HandlerInterceptor {
      */
     public final static String REQUEST_EXECUTE_TIME = "REQUEST_EXECUTE_TIME";
 
+    /** 记录响应日志时，gzip响应体解压后的最大字节数（10MB），超出则不记录响应体. */
+    private static final long MAX_GZIP_LOG_BODY_SIZE = 10L * 1024 * 1024;
+
     // 增加递归保护（兜底）
     private static final ThreadLocal<Boolean> IS_LOGGING = ThreadLocal.withInitial(() -> false);
 
@@ -287,16 +290,23 @@ public class GlobalInterceptor implements HandlerInterceptor {
 //            }
             try {
                 if (CompressUtil.isGzip(content)) {
-                    body = new String(CompressUtil.unGzip(content), charset);
+                    // 限制解压后的体积，避免压缩炸弹导致内存溢出
+                    body = new String(CompressUtil.unGzip(content, MAX_GZIP_LOG_BODY_SIZE), charset);
                 } else {
                     body = new String(content, charset);
                 }
-                responseWrapper.copyBodyToResponse();
+            } catch (CompressUtil.SizeLimitExceededException e) {
+                log.warn("response body is too large after gunzip, skip logging. limit={}", e.getMaxSize());
+                body = "[gzip body exceeds " + e.getMaxSize() + " bytes after decompress, omitted]";
             } catch (IOException e) {
                 log.warn("get response body error.", e);
-                if (body == null) {
-                    body = StringUtil.byte2hex(content);
-                }
+                body = StringUtil.byte2hex(content);
+            }
+            try {
+                // 无论日志内容是否解析成功，都必须把响应体写回客户端
+                responseWrapper.copyBodyToResponse();
+            } catch (IOException e) {
+                log.warn("copy response body error.", e);
             }
         } else {
             body = "Cannot read body for [" + contentType + "]";
