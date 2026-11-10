@@ -4,24 +4,27 @@
  */
 package com.uoquo.utils;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 /**
  * 描述：数据处理工具类. <br>
+ * 约定：
+ * <ul>
+ *   <li>字节序参数 asc：true 为小端（低位字节在前），false 为大端（高位字节在前）；不带该参数的方法默认小端.</li>
+ *   <li>入参不合法（null、长度不足、导联数不合法、数据长度与格式不匹配等）抛出{@link IllegalArgumentException}.</li>
+ * </ul>
  * 日期：2019-03-20 19:09 <br>
  * 变更：
  * <pre>
  * Version      Date           ModifiedBy       Content
  * --------     ----------     ------------     -----------------------
  * 1.0          2019-03-20     Administrator.           创建
+ * 1.1          2026-11-10     uoquo team       修复大端读取抛出数组越界；差分/212解压增加入参校验（导联数不合法时不再死循环）；
+ *                                              实现pack212；解压不再产生装箱对象和临时数组；去掉多余的throws声明
  * </pre>
  * @since   JDK 1.8
- * @version 1.0
+ * @version 1.1
  * @author  uoquo team
  */
 public class DataUtil {
@@ -36,7 +39,7 @@ public class DataUtil {
     
     /**
      * short转字节数组（默认小端）. <br>
-     * @param s shot数字
+     * @param s short数字
      */
     public static byte[] getBytes(short s)  {
         return getBytes(s, true);
@@ -44,24 +47,11 @@ public class DataUtil {
     
     /**
      * short转字节数组 . <br>
-     * @param s shot数字
+     * @param s short数字
      * @param asc true:小端格式 false：大端格式
      */
     public static byte[] getBytes(short s, boolean asc)  {
-        byte[] buf = new byte[2];
-        if (asc) {
-            for (int i = 0; i < buf.length; i++) {
-                buf[i] = (byte) (s & 0xff);
-                s >>= 8;
-            }
-        } else {
-            for (int i = buf.length - 1; i >= 0; i--) {
-                buf[i] = (byte) (s & 0xff);
-                s >>= 8;
-            }
-        }
-            
-        return buf;
+        return toBytes(s, 2, asc);
     }
     
     /**
@@ -78,19 +68,7 @@ public class DataUtil {
      * @param asc true:小端格式 false：大端格式
      */
     public static byte[] getBytes(int s, boolean asc) {
-        byte[] buf = new byte[4];
-        if (asc) {
-            for (int i = 0; i < buf.length; i++) {
-                buf[i] = (byte) (s & 0xff);
-                s >>= 8;
-            }
-        } else {
-            for (int i = buf.length - 1; i >= 0; i--) {
-                buf[i] = (byte) (s & 0xff);
-                s >>= 8;
-            }
-        }
-        return buf;
+        return toBytes(s, 4, asc);
     }
     
     /**
@@ -107,19 +85,7 @@ public class DataUtil {
      * @param asc true:小端格式 false：大端格式
      */
     public static byte[] getBytes(long s, boolean asc) {
-        byte[] buf = new byte[8];
-        if (asc) {
-            for (int i = 0; i < buf.length; i++) {
-                buf[i] = (byte) (s & 0xff);
-                s >>= 8;
-            }
-        } else {
-            for (int i = buf.length - 1; i >= 0; i--) {
-                buf[i] = (byte) (s & 0xff);
-                s >>= 8;
-            }
-        }
-        return buf;
+        return toBytes(s, 8, asc);
     }
 
     /**
@@ -149,35 +115,17 @@ public class DataUtil {
     }
     
     /**
-     * 字节数组转short.
+     * 字节数组转short（读取前2个字节）.
      * @param buf 数组
      * @param asc true:小端格式 false：大端格式
+     * @throws IllegalArgumentException 数组为null或者长度小于2
      */
     public static short getShort(byte[] buf, boolean asc) {
-        if (buf == null) {
-            throw new IllegalArgumentException("byte array is null!");
-        }
-        int len = 2;
-        if (buf.length < len) {
-            throw new IllegalArgumentException("byte array size mast >= 2 !");
-        }
-        short r = 0;
-        if (asc) {
-            for (int i = len -1; i >= 0; i--) {
-                r <<= 8;
-                r |= (buf[i] & 0xff);
-            }
-        } else {
-            for (int i = 0; i < len; i--) {
-                r <<= 8;
-                r |= (buf[i] & 0xff);
-            }
-        }
-        return r;
+        return (short) toNumber(buf, 2, asc);
     }
 
     /**
-     * 字节数组转无符号short（默认小端）. <br>
+     * 字节数组转无符号int（默认小端）. <br>
      * @param buf 数组
      */
     public static long getUnsignedInt(byte[] buf) {
@@ -185,7 +133,7 @@ public class DataUtil {
     }
 
     /**
-     * 字节数组转无符号short.
+     * 字节数组转无符号int.
      * @param buf 数组
      * @param asc true:小端格式 false：大端格式
      */
@@ -203,31 +151,13 @@ public class DataUtil {
     }
     
     /**
-     * 字节数组转int.
+     * 字节数组转int（读取前4个字节）.
      * @param buf 数组
      * @param asc true:小端格式 false：大端格式
+     * @throws IllegalArgumentException 数组为null或者长度小于4
      */
     public static int getInt(byte[] buf, boolean asc) {
-        if (buf == null) {
-            throw new IllegalArgumentException("byte array is null!");
-        }
-        int len = 4;
-        if (buf.length < len) {
-            throw new IllegalArgumentException("byte array size mast >= 4 !");
-        }
-        int r = 0;
-        if (asc) {
-            for (int i = len - 1; i >= 0; i--) {
-                r <<= 8;
-                r |= (buf[i] & 0xff);
-            }
-        } else {
-            for (int i = 0; i < len; i--) {
-                r <<= 8;
-                r |= (buf[i] & 0xff);
-            }
-        }
-        return r;
+        return (int) toNumber(buf, 4, asc);
     }
     
     /**
@@ -239,136 +169,159 @@ public class DataUtil {
     }
     
     /**
-     * 字节数组转long.
+     * 字节数组转long（读取前8个字节）.
      * @param buf 数组
      * @param asc true:小端格式 false：大端格式
+     * @throws IllegalArgumentException 数组为null或者长度小于8
      */
     public static long getLong(byte[] buf, boolean asc) {
+        return toNumber(buf, 8, asc);
+    }
+
+    /**
+     * 数字转字节数组（取低len个字节）.
+     */
+    private static byte[] toBytes(long value, int len, boolean asc) {
+        byte[] buf = new byte[len];
+        for (int i = 0; i < len; i++) {
+            byte b = (byte) (value >>> (8 * i)); // 第i个字节（i=0为最低位）
+            buf[asc ? i : len - 1 - i] = b;
+        }
+        return buf;
+    }
+
+    /**
+     * 字节数组的前len个字节转数字.
+     */
+    private static long toNumber(byte[] buf, int len, boolean asc) {
         if (buf == null) {
             throw new IllegalArgumentException("byte array is null!");
         }
-        int len = 8;
         if (buf.length < len) {
-            throw new IllegalArgumentException("byte array size mast >= 8 !");
+            throw new IllegalArgumentException("byte array size must be >= " + len + " !");
         }
         long r = 0;
         if (asc) {
             for (int i = len - 1; i >= 0; i--) {
-                r <<= 8;
-                r |= (buf[i] & 0xff);
+                r = (r << 8) | (buf[i] & 0xffL);
             }
         } else {
-            for (int i = 0; i < len; i--) {
-                r <<= 8;
-                r |= (buf[i] & 0xff);
+            for (int i = 0; i < len; i++) {
+                r = (r << 8) | (buf[i] & 0xffL);
             }
         }
         return r;
     }
     
     /** 
-     * 将byte转换为一个长度为8的byte数组.
+     * 将byte转换为一个长度为8的byte数组，每个元素为0或1.<br>
+     * 顺序：低位在前，即 array[0] 为最低位（bit0），array[7] 为最高位（bit7）.
      */
     public static byte[] to8Array(byte b) {
         byte[] array = new byte[8];
-        /*
-        for (int i = 7; i >= 0; i--) {
-            array[i] = (byte)(b & 1);
-            b = (byte) (b >> 1);
-        }
-        return array;
-        */
         for (int i = 0; i <= 7; i++) {
-            array[i] = (byte)(b & 1);
-            b = (byte) (b >> 1);
+            array[i] = (byte) ((b >> i) & 1);
         }
         return array;
     }
     
     /**
      * 8位差分解压.<br>
-     * 原理：每个导联的第一个数据记录原始数据（2字节），其余数据为差分记录（1字节，即：8位）
+     * 原理：每个导联的第一个数据记录原始数据（2字节，小端），其余数据为差分记录（1字节，即：8位），
+     * 按采样点依次存放（采样点1的各导联差分，采样点2的各导联差分，...）.<br>
+     * 输出：所有采样值，每个值2字节（小端），顺序同输入，输出长度 = 2 * data.length - 2 * leadLen.
      * @param data    4s的数据包（不含48字节头信息）
-     * @param leadLen 有效导联个数
+     * @param leadLen 有效导联个数（必须大于0）
      * @return 解压后的数据包
+     * @throws IllegalArgumentException data为null，导联数不合法，或者数据长度与格式不匹配
      */
-    public static byte[] unpackDifference(byte[] data, int leadLen) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        // 每个导联的上一个值
-        List<Short> preVal = new ArrayList<>(leadLen);
-        for (int k = 0; k < leadLen; k++) {
-            preVal.add((short) 0);
+    public static byte[] unpackDifference(byte[] data, int leadLen) {
+        if (data == null) {
+            throw new IllegalArgumentException("data is null!");
+        } else if (leadLen <= 0) {
+            throw new IllegalArgumentException("leadLen must be > 0 !");
         }
-        // 每个导联的第一个值（2字节存储）
+        int head = 2 * leadLen; // 每个导联的第一个值（2字节存储）
+        if (data.length < head) {
+            throw new IllegalArgumentException("data size must be >= " + head + " (2 * leadLen) !");
+        } else if ((data.length - head) % leadLen != 0) {
+            throw new IllegalArgumentException("difference data size must be a multiple of leadLen !");
+        }
+        byte[] out  = new byte[2 * data.length - head];
+        short[] pre = new short[leadLen]; // 每个导联的上一个值
         int pos = 0; // 读取data数据的位置
+        int idx = 0; // 写入out的位置
         for (int k = 0; k < leadLen; k++) {
-            byte[] temp = new byte[]{data[pos++], data[pos++]};
-            out.write(temp);
-            preVal.set(k, DataUtil.getShort(temp));
+            out[idx++] = data[pos];
+            out[idx++] = data[pos + 1];
+            pre[k] = (short) (((data[pos + 1] & 0xff) << 8) | (data[pos] & 0xff));
+            pos += 2;
         }
         // 按差分法计算剩余值（差分数值1字节存储）
         while (pos < data.length) {
             for (int k = 0; k < leadLen; k++) {
-                short v = preVal.get(k); // 第K导联的上一个采样数值
-                v += data[pos++];        // 第K导联的当前采样数值 = 上一数值 + 差分数值
-                preVal.set(k, v);
-                out.write(DataUtil.getBytes(v, true));
+                pre[k] += data[pos++]; // 第K导联的当前采样数值 = 上一数值 + 差分数值
+                out[idx++] = (byte) pre[k];
+                out[idx++] = (byte) (pre[k] >> 8);
             }
         }
-        return out.toByteArray();
+        return out;
     }
     
     /**
      * 12位差分解压.<br>
-     * 原理：每个导联的前两个数据记录原始数据（2字节），其余数据为差分记录（1.5字节，即：12位），差分数据按212格式存储
+     * 原理：每个导联的前两个数据记录原始数据（2字节，小端），其余数据为差分记录（1.5字节，即：12位），差分数据按212格式存储.<br>
+     * 输入顺序：采样点1的各导联原始值，采样点2的各导联原始值，之后每组（3 * leadLen 字节）为连续两个采样点的各导联差分.<br>
+     * 输出：所有采样值，每个值2字节（小端），每组差分输出为：采样点N的各导联值，采样点N+1的各导联值.
      * @param data    4s的数据包（不含48字节头信息）
-     * @param leadLen 有效导联个数
+     * @param leadLen 有效导联个数（必须大于0）
+     * @return 解压后的数据包
+     * @throws IllegalArgumentException data为null，导联数不合法，或者数据长度与格式不匹配
      */
-    public static byte[] unpack212(byte[] data, int leadLen) throws Exception {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        // 每个导联的上一个值
-        List<Short> preVal = new ArrayList<>(leadLen);
-        for (int k = 0; k < leadLen; k++) {
-            preVal.add((short) 0);
+    public static byte[] unpack212(byte[] data, int leadLen) {
+        if (data == null) {
+            throw new IllegalArgumentException("data is null!");
+        } else if (leadLen <= 0) {
+            throw new IllegalArgumentException("leadLen must be > 0 !");
         }
-        // 每个导联的前两个值（每个值2字节存储）
+        int head  = 4 * leadLen; // 每个导联的前两个值（每个值2字节存储）
+        int group = 3 * leadLen; // 一组差分：每个导联3字节（2个差分数值）
+        if (data.length < head) {
+            throw new IllegalArgumentException("data size must be >= " + head + " (4 * leadLen) !");
+        } else if ((data.length - head) % group != 0) {
+            throw new IllegalArgumentException("difference data size must be a multiple of " + group + " (3 * leadLen) !");
+        }
+        int groups = (data.length - head) / group;
+        byte[] out  = new byte[head + groups * head];
+        short[] pre = new short[leadLen]; // 每个导联的上一个值
         int pos = 0; // 读取data数据的位置
+        int idx = 0; // 写入out的位置
         for (int i = 0; i < 2; i++) {
             for (int k = 0; k < leadLen; k++) {
-                byte[] temp = new byte[]{data[pos++], data[pos++]};
-                out.write(temp);
-                preVal.set(k, DataUtil.getShort(temp));
+                out[idx++] = data[pos];
+                out[idx++] = data[pos + 1];
+                pre[k] = (short) (((data[pos + 1] & 0xff) << 8) | (data[pos] & 0xff));
+                pos += 2;
             }
         }
-        
-        List<Short> list1 = new ArrayList<>(leadLen); // 采样点 N   的数据
-        List<Short> list2 = new ArrayList<>(leadLen); // 采样点 N+1 的数据
+        int second = 2 * leadLen; // 采样点 N+1 的数据，相对于采样点 N 的偏移
         while (pos < data.length) {
-            list1.clear();
-            list2.clear();
-            // 解析一组数据
             for (int k = 0; k < leadLen; k++) {
-                short val = preVal.get(k); // 第K导联的上一个采样数值
                 // 212解压（即：将3个字节解压位2个差分数值）
-                List<Integer> diff = unpack212(data[pos++], data[pos++], data[pos++]);
-                // 第一个数值
-                val += diff.get(0).shortValue();
-                list1.add(val);
-                // 第二个数值
-                val += diff.get(1).shortValue();
-                list2.add(val);
-                // 最后一个数值作为下一次计算的基数
-                preVal.set(k, val);
+                int d1 = value1(data[pos], data[pos + 1]);
+                int d2 = value2(data[pos + 1], data[pos + 2]);
+                pos += 3;
+                short s1 = (short) (pre[k] + d1); // 采样点 N   的数据
+                short s2 = (short) (s1 + d2);     // 采样点 N+1 的数据
+                pre[k] = s2;                      // 最后一个数值作为下一次计算的基数
+                out[idx + 2 * k]              = (byte) s1;
+                out[idx + 2 * k + 1]          = (byte) (s1 >> 8);
+                out[idx + second + 2 * k]     = (byte) s2;
+                out[idx + second + 2 * k + 1] = (byte) (s2 >> 8);
             }
-            // 将数据输出
-            for (Short item : list1) {
-                out.write(DataUtil.getBytes(item, true));
-            }
-            for (Short item : list2) {
-                out.write(DataUtil.getBytes(item, true));
-            }
+            idx += 4 * leadLen;
         }
-        return out.toByteArray();
+        return out;
     }
     
     /**
@@ -383,26 +336,23 @@ public class DataUtil {
      * @param c 第三个字节
      */
     public static List<Integer> unpack212(byte a, byte b, byte c) {
-        // 第一个数值
-        int aa = a & 0xff; // 将a转换为无符号类型， 0xff：1111 1111
-        int ab = b & 0x0f; // b的低4位， 0x0f：0000 1111
-        int v1 = ((ab << 8) | aa) & 0x7ff; // 0x7ff：‭0111 1111 1111
-        // b的低4位符号位（即：b的第4位）
-        if ((b & 0x08) > 0) { // 0x08：0000 1000
-            v1 = -v1;
-        }
-        
-        // 第二个数值
-        int cc = c & 0xff;
-        int cb = b & 0xf0; // b的高4位， 0xf0：1111 0000
-        int v2 = ((cb << 4) | cc) & 0x7ff;
-        // b的高4位符号位（即：b的第8位）
-        if ((b & 0x80) > 0) { // 0x80：1000 0000
-            v2 = -v2;
-        }
-        
-        //返回两个值
-        return Arrays.asList(v1, v2);
+        return Arrays.asList(value1(a, b), value2(b, c));
+    }
+
+    /**
+     * 212的第一个数值（含符号位）：a为低八位，b的低三位为高三位，b的第4位为符号位.
+     */
+    private static int value1(byte a, byte b) {
+        int v = (((b & 0x0f) << 8) | (a & 0xff)) & 0x7ff; // 0x7ff：0111 1111 1111
+        return ((b & 0x08) != 0) ? -v : v;                // 0x08：0000 1000
+    }
+
+    /**
+     * 212的第二个数值（含符号位）：c为低八位，b的高4位中的低三位为高三位，b的第8位为符号位.
+     */
+    private static int value2(byte b, byte c) {
+        int v = (((b & 0xf0) << 4) | (c & 0xff)) & 0x7ff;
+        return ((b & 0x80) != 0) ? -v : v;                // 0x80：1000 0000
     }
     
     /**
@@ -436,19 +386,28 @@ public class DataUtil {
     }
     
     /**
-     * 212压缩（含符号位）.<br>
-     * 注：会有精度损失！！
+     * 212压缩（含符号位），是{@link #unpack212(byte, byte, byte)}的逆运算.<br>
+     * 注：会有精度损失！！每个数据只保留11位幅值（0 ~ 2047），绝对值超过2047的数据按2047处理.
      * @param a 数据1
      * @param b 数据2
+     * @return 3个字节：a的低八位，（b的高三位、符号位）和（a的高三位、符号位），b的低八位
      */
     public static byte[] pack212(short a, short b) {
-        //TODO
-        return null;
+        int ma = Math.min(Math.abs((int) a), 0x7ff); // 幅值（限制在11位以内）
+        int mb = Math.min(Math.abs((int) b), 0x7ff);
+        int mid = (((mb >>> 8) & 0x07) << 4) | ((ma >>> 8) & 0x07);
+        if (a < 0) {
+            mid |= 0x08; // a的符号位
+        }
+        if (b < 0) {
+            mid |= 0x80; // b的符号位
+        }
+        return new byte[] { (byte) (ma & 0xff), (byte) mid, (byte) (mb & 0xff) };
     }
     
     /**
      * 212压缩（无符号位）.<br>
-     * 注：会有精度损失！！
+     * 注：会有精度损失！！每个数据只保留低12位，超过12位的高位被丢弃.
      * <pre>
      * 转换前：
      *       a = 2222 1111 1111 
