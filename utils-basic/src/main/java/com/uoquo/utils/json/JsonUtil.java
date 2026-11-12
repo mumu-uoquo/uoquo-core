@@ -360,6 +360,33 @@ public class JsonUtil {
 
 
     /**
+     * 反序列化（已经解析成 JSON 树的内容，避免再转成字符串后重复解析）
+     * @param node  待转换的 JSON 树
+     * @param type  待转换的对象类型
+     */
+    public static <T> T deserialize(JsonNode node, JavaType type) {
+        try {
+            return mapperNoType.readerFor(type).readValue(node);
+        } catch (IOException e) {
+            // 因为异常继续抛给了调用方，此时仅debug时记录日志
+            log.debug("JSON反序列化出错. content={}.", node);
+            throw new IllegalArgumentException(String.format("对象[%s]反序列化失败.", node), e);
+        }
+    }
+
+    /**
+     * 反序列化（已经解析成 JSON 树的内容，避免再转成字符串后重复解析）
+     * @param node        待转换的 JSON 树
+     * @param outerClazz  外层对象类型
+     * @param innerClazz  内层对象类型
+     */
+    @SafeVarargs
+    public static <T, E> T deserialize(JsonNode node, Class<T> outerClazz, Class<E>... innerClazz) {
+        JavaType javaType = mapperNoType.getTypeFactory().constructParametricType(outerClazz, innerClazz);
+        return deserialize(node, javaType);
+    }
+
+    /**
      * {@link org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer GenericJackson2JsonRedisSerializer}
      */
     private static class NullValueSerializer extends StdSerializer<NullValue> {
