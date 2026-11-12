@@ -17,8 +17,13 @@ public class UoquoOriginFactory {
      * 不能用 RemoteApplicationEvent.TRANSIENT_ORIGIN，否则会出现NPE异常导致事件发布不成功
      */
 //    protected static final String TRANSIENT_ORIGIN = "____transient_origin_service___";
-    private static final String TRANSIENT_ORIGIN = "DEFAULT_TRANSIENT_ORIGIN";
+    public static final String TRANSIENT_ORIGIN = "DEFAULT_TRANSIENT_ORIGIN";
 
+    /**
+     * 获取事件的来源服务名：优先取参数，其次 {@code spring.application.name}，再次 {@code app.name}，都没有则为 {@link #TRANSIENT_ORIGIN}。
+     * @param serviceName 指定的服务名（可空）
+     * @return 来源服务名
+     */
     public String getOrigin(String serviceName) {
         if (StringUtil.notNull(serviceName)) {
             return serviceName;

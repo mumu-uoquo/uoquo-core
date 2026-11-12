@@ -7,7 +7,7 @@ package com.uoquo.cloud.test;
 import com.uoquo.cloud.events.RemoteEvent;
 
 public class TestRemoteEvent extends RemoteEvent<String> {
-    public TestRemoteEvent(String businessType, String operationType, String operationStatus) {
-        super(businessType, operationType, operationStatus);
+    public TestRemoteEvent(String businessType, String operationType, String operationResult) {
+        super(businessType, operationType, operationResult);
     }
 }

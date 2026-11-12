@@ -4,9 +4,13 @@
  */
 package com.uoquo.cloud;
 
+import com.uoquo.cloud.events.RemoteEventListenerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.cloud.bus.ServiceMatcher;
 import com.uoquo.cloud.interceptor.CheckParam4GatewayInterceptor;
 import com.uoquo.cloud.interceptor.CurrentUser4GatewayInterceptor;
 import com.uoquo.web.ServiceConfig;
+import com.uoquo.web.events.UoquoEventListenerFactory;
 import com.uoquo.web.interceptor.CheckParamInterceptor;
 import com.uoquo.web.interceptor.CurrentUserInterceptorAdapter;
 import org.slf4j.Logger;
@@ -35,6 +39,18 @@ public class CloudConfig {
     @PostConstruct
     public void setProperties(){
         log.debug("CloudConfig init ...");
+    }
+
+    /* ******************* event ******************* */
+    /**
+     * 事件监听工厂：只要引入了 cloud-core 就使用（不依赖 Kafka 开关），
+     * 这样 {@code RemoteEvent<T>} 的泛型过滤、MDC 等行为在开启/关闭 Kafka 时保持一致。
+     */
+    @Bean
+    @ConditionalOnMissingBean(value = UoquoEventListenerFactory.class)
+    public UoquoEventListenerFactory uoquoEventListenerFactory(ObjectProvider<ServiceMatcher> serviceMatcher) {
+        log.debug("加载BEAN：RemoteEventListenerFactory");
+        return new RemoteEventListenerFactory(serviceMatcher);
     }
 
     /* ******************* interceptor ******************* */

@@ -72,8 +72,9 @@ public class RemoteEventDeserializer extends StdDeserializer<RemoteEvent<?>> {
         Class<?> resolvedClass = resolver.resolve(dataType, "RemoteEvent");
         log.debug("the event message is RemoteEvent, and the dataType is '{}', resolved class is '{}'", dataType, resolvedClass);
 
-        // 用 JsonUtil 的 mapperNoType 反序列化，不能直接用mapper否则会出现递归死循环
-        return JsonUtil.deserialize(node.toString(), RemoteEvent.class, resolvedClass);
+        // 用 JsonUtil 的 mapperNoType 反序列化，不能直接用mapper否则会出现递归死循环；
+        // 直接使用已经解析好的 JSON 树，避免 toString 后再解析一遍
+        return JsonUtil.deserialize(node, RemoteEvent.class, resolvedClass);
     }
 
 }

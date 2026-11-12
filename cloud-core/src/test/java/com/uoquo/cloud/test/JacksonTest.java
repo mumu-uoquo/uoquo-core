@@ -12,12 +12,12 @@ public class JacksonTest {
 
     @Test
     public void test() {
-//        RemoteEvent<String> event = new RemoteEvent<>("businessType", "operationType", "operationStatus");
+//        RemoteEvent<String> event = new RemoteEvent<>("businessType", "operationType", "operationResult");
 //        event.setOldData("aa");
 ////        event.setDataType(String.class);
 //        System.out.println(JsonUtil.serialize( event));
 
-        TestRemoteEvent testEvent = new TestRemoteEvent("businessType", "operationType", "operationStatus");
+        TestRemoteEvent testEvent = new TestRemoteEvent("businessType", "operationType", "operationResult");
         System.out.println(JsonUtil.serialize( testEvent));
     }
 }

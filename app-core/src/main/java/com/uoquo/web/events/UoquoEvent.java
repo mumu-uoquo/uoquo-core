@@ -8,19 +8,35 @@ import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 import java.util.Map;
 
+/**
+ * 事件的公共信息。按含义分为以下几组（与 {@link EventHeader}、{@link HeaderBackedEvent} 的分组一致）：
+ * <ol>
+ *   <li>事件标识：事件ID、重发标识；</li>
+ *   <li>会话与请求：会话、请求ID；</li>
+ *   <li>事件四维度（谁做了什么、成没成）：业务大类、业务子类、操作动作、操作结果；</li>
+ *   <li>业务数据：业务表、业务ID、数据所属机构；</li>
+ *   <li>操作人信息：操作人、所属机构、操作时间；</li>
+ *   <li>操作内容：内容、扩展信息；</li>
+ *   <li>操作端信息：授权、设备、版本、IP。</li>
+ * </ol>
+ * 注：“业务状态”作为与“业务数据”同级的载荷数据，仅用于标识业务在做完动作后的流程状态，不作为消息头的内容
+ */
 public interface UoquoEvent {
 
+    /* ============================ 事件标识 ============================ */
+
     /**
-     * 获取事件ID
+     * 获取事件ID：自定义事件消息的唯一标识（业务用它标识消息、入库）。<br>
+     * 由发布器在每次发布时生成并覆盖（回放时也会重新生成），发布前为空。
      * @return 事件ID
      */
-    String getId();
+    String getEventId();
 
     /**
      * 设置事件ID（内部统一设置）
-     * @param id 事件ID
+     * @param eventId 事件ID
      */
-    void setId(String id);
+    void setEventId(String eventId);
 
     /**
      * 获取重发标识（标识当前事件信息是否重发的）
@@ -38,17 +54,7 @@ public interface UoquoEvent {
         // do nothing;
     }
 
-    /**
-     * 获取事件目标服务名
-     * @return 目标服务名（可空）
-     */
-    String getDestination();
-
-    /**
-     * 设置事件目标服务名
-     * @param destination 目标服务名（可空）
-     */
-    void setDestination(String destination);
+    /* ============================ 会话与请求 ============================ */
 
     /**
      * 获取会话ID
@@ -72,10 +78,12 @@ public interface UoquoEvent {
      * 设置请求ID
      * @param traceId 本次请求的ID
      */
-    void setTraceId(String traceId) ;
+    void setTraceId(String traceId);
+
+    /* ============================ 事件四维度（谁做了什么、成没成） ============================ */
 
     /**
-     * 获取业务类型
+     * 获取业务类型（009）
      * @return 业务类型
      */
     String getBusinessType();
@@ -97,6 +105,44 @@ public interface UoquoEvent {
      * @param businessSubType 业务子类型
      */
     void setBusinessSubType(String businessSubType);
+
+    /**
+     * 获取操作动作（即：业务动作，010）
+     * @return 操作动作
+     */
+    String getOperationType();
+
+    /**
+     * 设置操作动作（即：业务动作，010）
+     * @param operationType 操作动作
+     */
+    void setOperationType(@NotNull String operationType);
+
+    /**
+     * 获取操作结果（011）
+     * @return 操作结果
+     */
+    String getOperationResult();
+
+    /**
+     * 设置操作结果（011）
+     * @param operationResult 操作结果
+     */
+    void setOperationResult(String operationResult);
+
+    /**
+     * 获取业务状态（当前操作结束后，业务流程所处状态）
+     * @return 业务状态
+     */
+    String getBusinessStatus();
+
+    /**
+     * 设置业务状态（当前操作结束后，业务流程所处状态）
+     * @param businessStatus 业务状态
+     */
+    void setBusinessStatus(String businessStatus);
+
+    /* ============================ 业务数据 ============================ */
 
     /**
      * 获取业务表名
@@ -133,6 +179,8 @@ public interface UoquoEvent {
      * @param businessInstituteId 业务数据所属机构ID
      */
     void setBusinessInstituteId(String businessInstituteId);
+
+    /* ============================ 操作人信息 ============================ */
 
     /**
      * 获取操作人ID
@@ -171,30 +219,6 @@ public interface UoquoEvent {
     void setOperatorInstituteId(String operatorInstituteId);
 
     /**
-     * 获取操作类型（即：业务动作，010）
-     * @return 操作类型
-     */
-    String getOperationType();
-
-    /**
-     * 设置操作类型（即：业务动作，010）
-     * @param operationType 操作类型
-     */
-    void setOperationType(@NotNull String operationType);
-
-    /**
-     * 获取执行状态
-     * @return 执行状态
-     */
-    String getOperationStatus();
-
-    /**
-     * 设置执行状态（011）
-     * @param operationStatus 执行状态
-     */
-    void setOperationStatus(String operationStatus);
-
-    /**
      * 获取操作时间
      * @return 操作时间
      */
@@ -205,6 +229,8 @@ public interface UoquoEvent {
      * @param operationTime 操作时间
      */
     void setOperationTime(Date operationTime);
+
+    /* ============================ 操作内容 ============================ */
 
     /**
      * 获取操作内容
@@ -236,6 +262,8 @@ public interface UoquoEvent {
      * @param val 扩展信息value
      */
     <E> void addExtension(String key, E val);
+
+    /* ============================ 操作端信息 ============================ */
 
     /**
      * 获取操作端授权

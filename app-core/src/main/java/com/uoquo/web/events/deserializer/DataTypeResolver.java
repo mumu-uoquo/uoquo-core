@@ -4,6 +4,7 @@
  */
 package com.uoquo.web.events.deserializer;
 
+import com.uoquo.web.events.EventSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,19 +59,17 @@ public class DataTypeResolver {
             return Map.class;
         }
 
-        if (dataType.contains(".")) {
-            // 含 "." → 先尝试全限定名加载
-            Optional<Class<?>> byFqn = tryLoadByFqn(dataType);
+        // 去掉泛型参数（如 java.util.List<com.x.Foo> → java.util.List），保证能被类加载器识别
+        String rawName = EventSupport.rawTypeName(dataType);
+        if (rawName.contains(".")) {
+            // 含 "." → 先尝试全限定名加载（嵌套类的二进制名 Outer$Inner 可直接加载）
+            Optional<Class<?>> byFqn = tryLoadByFqn(rawName);
             if (byFqn.isPresent()) {
                 return byFqn.get();
             }
-            // 加载失败 → 取最后一个 "." 后的简单类名走第二级
-            String simpleName = dataType.substring(dataType.lastIndexOf('.') + 1);
-            return resolveBySimpleName(simpleName, dataType, eventType);
-        } else {
-            // 不含 "." → 直接走第二级
-            return resolveBySimpleName(dataType, dataType, eventType);
         }
+        // 加载失败或不含 "." → 取简单类名（去掉包名与外部类前缀，与扫描索引使用的 Class#getSimpleName 一致）走第二级
+        return resolveBySimpleName(EventSupport.simpleName(rawName), dataType, eventType);
     }
 
     /**

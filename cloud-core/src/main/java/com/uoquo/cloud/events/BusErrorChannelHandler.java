@@ -5,6 +5,7 @@
 package com.uoquo.cloud.events;
 
 import com.uoquo.cloud.kafka.DeserializationFailureData;
+import com.uoquo.web.events.EventSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -56,7 +57,8 @@ public class BusErrorChannelHandler {
                 } else {
                     payloadStr = String.valueOf(payload);
                 }
-                log.warn("Spring Cloud Bus received unresolvable message, ignored. payload: {}", payloadStr, cause);
+                // 消息原文中带有发起人的会话 token，写日志前需要脱敏
+                log.warn("Spring Cloud Bus received unresolvable message, ignored. payload: {}", EventSupport.maskToken(payloadStr), cause);
             } else {
                 log.warn("Spring Integration errorChannel received error: {}", cause.getMessage(), cause);
             }

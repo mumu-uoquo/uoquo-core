@@ -78,7 +78,7 @@ public class PreservationPropertyTest {
 
         // 构造 type=RemoteEvent 的合法消息（isBugCondition = false）
         String knownTypeJson = "{\"type\":\"RemoteEvent\",\"id\":\"known-001\",\"originService\":\"test-service\","
-                + "\"businessType\":\"TEST\",\"operationType\":\"CREATE\",\"operationStatus\":\"SUCCESS\"}";
+                + "\"businessType\":\"TEST\",\"operationType\":\"CREATE\",\"operationResult\":\"SUCCESS\"}";
         byte[] rawPayload = knownTypeJson.getBytes(StandardCharsets.UTF_8);
         Message<byte[]> message = MessageBuilder.withPayload(rawPayload).build();
 

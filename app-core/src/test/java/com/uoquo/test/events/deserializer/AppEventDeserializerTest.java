@@ -68,9 +68,8 @@ class AppEventDeserializerTest {
             String json = """
                 {
                     "type": "AppEvent",
-                    "id": "event-001",
+                    "eventId": "event-001",
                     "retry": false,
-                    "destination": "service-b",
                     "token": "token-abc",
                     "traceId": "trace-123",
                     "businessType": "ORDER",
@@ -82,7 +81,7 @@ class AppEventDeserializerTest {
                     "operatorName": "张三",
                     "operatorInstituteId": "inst-1",
                     "operationType": "CREATE",
-                    "operationStatus": "SUCCESS",
+                    "operationResult": "SUCCESS",
                     "content": "创建订单",
                     "appKey": "app-001",
                     "appDeviceId": "device-001",
@@ -98,9 +97,8 @@ class AppEventDeserializerTest {
             AppEvent<?> event = objectMapper.readValue(json, AppEvent.class);
 
             assertNotNull(event);
-            assertEquals("event-001", event.getId());
+            assertEquals("event-001", event.getEventId());
             assertFalse(event.isRetry());
-            assertEquals("service-b", event.getDestination());
             assertEquals("token-abc", event.getToken());
             assertEquals("trace-123", event.getTraceId());
             assertEquals("ORDER", event.getBusinessType());
@@ -112,7 +110,7 @@ class AppEventDeserializerTest {
             assertEquals("张三", event.getOperatorName());
             assertEquals("inst-1", event.getOperatorInstituteId());
             assertEquals("CREATE", event.getOperationType());
-            assertEquals("SUCCESS", event.getOperationStatus());
+            assertEquals("SUCCESS", event.getOperationResult());
             assertEquals("创建订单", event.getContent());
             assertEquals("app-001", event.getAppKey());
             assertEquals("device-001", event.getAppDeviceId());
@@ -140,7 +138,7 @@ class AppEventDeserializerTest {
             assertNotNull(event);
             assertEquals("ORDER", event.getBusinessType());
             assertEquals("CREATE", event.getOperationType());
-            assertNull(event.getId());
+            assertNull(event.getEventId());
             assertNull(event.getBusinessId());
             assertFalse(event.isRetry());
         }
@@ -432,22 +430,24 @@ class AppEventDeserializerTest {
         }
 
         @Test
-        @DisplayName("destination 定向服务名 → 正确解析")
-        void shouldDeserializeDestination() throws IOException {
+        @DisplayName("旧版本 JSON 中的 id、destination（已改名/删除）被忽略，不影响解析")
+        void shouldIgnoreLegacyIdAndDestination() throws IOException {
             // language=JSON
             String json = """
                 {
                     "type": "AppEvent",
+                    "id": "legacy-id",
+                    "destination": "target-service",
                     "businessType": "ORDER",
-                    "operationType": "CREATE",
-                    "destination": "target-service"
+                    "operationType": "CREATE"
                 }
                 """;
 
             AppEvent<?> event = objectMapper.readValue(json, AppEvent.class);
 
             assertNotNull(event);
-            assertEquals("target-service", event.getDestination());
+            assertEquals("ORDER", event.getBusinessType());
+            assertNull(event.getEventId());
         }
 
         @Test
@@ -711,7 +711,7 @@ class AppEventDeserializerTest {
         void shouldRoundTripAllFields() throws IOException {
             AppEvent<Map<String, Object>> event = new AppEvent<>("ORDER", "CREATE", "SUCCESS");
 
-            event.setId("evt-001");
+            event.setEventId("evt-001");
             event.setToken("tok-abc");
             event.setTraceId("tr-123");
             event.setBusinessId("10086");
@@ -721,7 +721,6 @@ class AppEventDeserializerTest {
             event.setOperatorName("张三");
             event.setOperationTime(new Date());
             event.setContent("测试内容");
-            event.setDestination("target-svc");
             event.setAppKey("app-001");
             event.setAppIp("10.0.0.1");
             event.setRemarks("备注");
@@ -742,10 +741,10 @@ class AppEventDeserializerTest {
             AppEvent<?> deserialized = objectMapper.readValue(json, AppEvent.class);
 
             assertNotNull(deserialized);
-            assertEquals("evt-001", deserialized.getId());
+            assertEquals("evt-001", deserialized.getEventId());
             assertEquals("ORDER", deserialized.getBusinessType());
             assertEquals("CREATE", deserialized.getOperationType());
-            assertEquals("SUCCESS", deserialized.getOperationStatus());
+            assertEquals("SUCCESS", deserialized.getOperationResult());
             assertEquals("tok-abc", deserialized.getToken());
             assertEquals("tr-123", deserialized.getTraceId());
             assertEquals("10086", deserialized.getBusinessId());
@@ -754,7 +753,6 @@ class AppEventDeserializerTest {
             assertEquals("user-001", deserialized.getOperatorId());
             assertEquals("张三", deserialized.getOperatorName());
             assertEquals("测试内容", deserialized.getContent());
-            assertEquals("target-svc", deserialized.getDestination());
             assertEquals("app-001", deserialized.getAppKey());
             assertEquals("10.0.0.1", deserialized.getAppIp());
             assertEquals("备注", deserialized.getRemarks());

@@ -162,6 +162,19 @@ public void onOrderPaid(RemoteEvent event) {
 - 内置类型（String / Integer / Map 等）自动识别
 - 自定义 `DataTypeResolver` 解析复杂泛型
 
+### 事件字段说明
+
+事件消息头由「业务大类 + 业务子类 + 操作动作 + 操作结果」四个维度组成，
+`businessStatus` 作为与业务数据同级的载荷，仅用于标识操作结束后业务流程所处状态，不作为消息头。
+
+| 字段 | 类别 | 说明 |
+|------|------|------|
+| `businessType` | 消息头（009） | 业务大类 |
+| `businessSubType` | 消息头 | 业务子类 |
+| `operationType` | 消息头（010） | 操作动作 |
+| `operationResult` | 消息头（011） | 操作结果 |
+| `businessStatus` | 业务载荷 | 当前操作结束后业务流程所处状态（与业务数据同级，不作为消息头） |
+
 ---
 
 ### 4. IP Hash 负载均衡

@@ -10,24 +10,19 @@ import com.uoquo.cloud.events.BusErrorChannelHandler;
 import com.uoquo.cloud.events.RemoteEvent;
 import com.uoquo.cloud.events.deserializer.RemoteEventDeserializer;
 import com.uoquo.web.events.deserializer.DataTypeResolver;
-import com.uoquo.web.events.deserializer.EventPackageScanner;
 import com.uoquo.cloud.kafka.DeserializationFailureData;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.condition.SearchStrategy;
 import org.springframework.cloud.bus.jackson.BusJacksonAutoConfiguration;
-import org.springframework.cloud.bus.jackson.RemoteApplicationEventScan;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.integration.channel.AbstractMessageChannel;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -35,10 +30,6 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 
 /**
  * 自动配置类，将 {@link RemoteEventDeserializer} 精确注册到
@@ -62,28 +53,20 @@ public class RemoteEventDeserializerAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RemoteEventDeserializerAutoConfiguration.class);
 
-    @Bean
-    @ConditionalOnMissingBean(value = EventPackageScanner.class, search = SearchStrategy.CURRENT)
-    public EventPackageScanner eventPackageScanner(ApplicationContext ctx) {
-        log.info("Scanning annotations for RemoteApplicationEventScan");
-        Map<String, Object> beans = ctx.getBeansWithAnnotation(RemoteApplicationEventScan.class);
-        List<String> packages = new ArrayList<>();
-        for (Object bean : beans.values()) {
-            RemoteApplicationEventScan annotation = AnnotationUtils.findAnnotation(bean.getClass(), RemoteApplicationEventScan.class);
-            if (annotation != null) {
-                packages.addAll(Arrays.asList(annotation.value()));
-            }
-        }
-        return new EventPackageScanner(packages.toArray(new String[0]));
-    }
+    // 事件类的扫描包由 app-core 的 EventPackageScanner 统一收集，
+    // @RemoteApplicationEventScan 声明的包见 RemoteEventScanAutoConfiguration（通过 EventScanPackagesProvider 提供）
 
     @Bean
     public RemoteEventDeserializer remoteEventDeserializer(DataTypeResolver resolver) {
         return new RemoteEventDeserializer(resolver);
     }
 
+    /**
+     * 注意：BeanPostProcessor 必须是 static 方法，这是 Spring 对 BeanPostProcessor 的要求，避免所在配置类被提前初始化；
+     * 反序列化器通过 ObjectProvider 延迟到需要时（busJsonConverter 创建时）再获取。
+     */
     @Bean
-    public BeanPostProcessor remoteEventDeserializerBeanPostProcessor(RemoteEventDeserializer deserializer) {
+    public static BeanPostProcessor remoteEventDeserializerBeanPostProcessor(ObjectProvider<RemoteEventDeserializer> deserializerProvider) {
         return new BeanPostProcessor() {
 
             /**
@@ -94,20 +77,22 @@ public class RemoteEventDeserializerAutoConfiguration {
                 if (!"busJsonConverter".equals(beanName)) {
                     return bean;
                 }
+                // 找不到 Bus 的 ObjectMapper 时，RemoteEvent 的泛型数据将无法还原（退化为 Map，监听器中出现类型转换异常），
+                // 属于与 Spring Cloud Bus 版本不兼容，直接启动失败，避免带着隐患运行
                 Field mapperField = ReflectionUtils.findField(bean.getClass(), "mapper", ObjectMapper.class);
                 if (mapperField == null) {
-                    log.warn("RemoteEventDeserializerAutoConfiguration: 'mapper' field not found in {}", bean.getClass().getName());
-                    return bean;
+                    throw new IllegalStateException("RemoteEventDeserializerAutoConfiguration: 'mapper' field not found in "
+                            + bean.getClass().getName() + ", the Spring Cloud Bus version may be incompatible.");
                 }
                 ReflectionUtils.makeAccessible(mapperField);
                 ObjectMapper busMapper = (ObjectMapper) ReflectionUtils.getField(mapperField, bean);
                 if (busMapper == null) {
-                    log.warn("RemoteEventDeserializerAutoConfiguration: Bus ObjectMapper is null, skipping");
-                    return bean;
+                    throw new IllegalStateException("RemoteEventDeserializerAutoConfiguration: Bus ObjectMapper is null in "
+                            + bean.getClass().getName());
                 }
                 // 自定义RemoteEvent解析器
                 SimpleModule module = new SimpleModule("RemoteEventDeserializerModule");
-                module.addDeserializer(RemoteEvent.class, deserializer);
+                module.addDeserializer(RemoteEvent.class, deserializerProvider.getObject());
                 busMapper.registerModule(module);
                 log.debug("RemoteEventDeserializer registered to Bus ObjectMapper before afterPropertiesSet");
                 return bean;

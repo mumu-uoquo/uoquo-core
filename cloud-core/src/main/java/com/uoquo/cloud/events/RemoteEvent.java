@@ -4,144 +4,42 @@
  */
 package com.uoquo.cloud.events;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.uoquo.utils.StringUtil;
-import com.uoquo.web.events.UoquoEvent;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+
 import org.jspecify.annotations.NonNull;
 import org.springframework.cloud.bus.event.RemoteApplicationEvent;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.uoquo.utils.StringUtil;
+import com.uoquo.web.events.EventHeader;
+import com.uoquo.web.events.EventSupport;
+import com.uoquo.web.events.HeaderBackedEvent;
 
 /**
- * 子类必须实现无参构造函数，否则事件处理器会报错
+ * 微服务事件（经 Spring Cloud Bus 发往其他服务）。<br>
+ * 事件的公共信息（会话、请求、业务维度、操作人、操作端等）保存在 {@link EventHeader} 中，
+ * 通过 {@link HeaderBackedEvent} 的默认方法访问（如 {@code getBusinessId()}、{@code setOperatorId(..)}）；
+ * 来源服务、目标服务（路由）由父类 {@link RemoteApplicationEvent} 保存（{@code originService}、{@code destinationService}），
+ * 本类不再保存第二份；父类的 {@code id} 是 Bus 自己使用的ID，业务的事件ID是公共信息中的 {@code eventId}。
+ * 本类只维护与泛型 {@code T} 相关的业务数据：{@code dataType}、旧数据、新数据。
+ *
+ * <p>子类必须实现无参构造函数，否则事件处理器会报错；子类通过 getter/setter 访问公共信息。</p>
  * @author xuhz
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-@JsonIgnoreProperties("source")
-public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent {
+// destination：旧版本事件 JSON 中的属性（已删除，路由以 destinationService 为准），读取历史记录/重发时需要忽略
+@JsonIgnoreProperties({"source", "destination"})
+public class RemoteEvent<T> extends RemoteApplicationEvent implements HeaderBackedEvent {
     protected static final Object TRANSIENT_SOURCE = new Object();
 
     protected static final UoquoOriginFactory ORIGIN_FACTORY = new UoquoOriginFactory();
 
     /**
-     * 消息ID（可空）
+     * 公共信息
      */
-    protected String id;
-
-    /**
-     * 重发标识（标识当前事件信息是否是重发的）
-     */
-    protected boolean retry;
-
-    /**
-     * 事件目的地
-     */
-    protected String destination;
-
-    /**
-     * 会话标识
-     */
-    protected String token;
-
-    /**
-     * 当次请求ID
-     */
-    protected String traceId;
-
-    /**
-     * 业务类型（009）
-     */
-    protected String businessType;
-
-    /**
-     * 业务子类型（可自由定义）
-     */
-    protected String businessSubType;
-
-    /**
-     * 业务数据表名
-     */
-    protected String businessTable;
-
-    /**
-     * 业务ID
-     */
-    protected String businessId;
-
-    /**
-     * 业务数据所属机构ID
-     */
-    protected String businessInstituteId;
-
-    /**
-     * 操作人ID
-     */
-    protected String operatorId;
-
-    /**
-     * 操作人名称
-     */
-    protected String operatorName;
-
-    /**
-     * 操作人所属机构ID
-     */
-    protected String operatorInstituteId;
-
-    /**
-     * 操作类型（即：业务动作，010）
-     */
-    protected String operationType;
-
-    /**
-     * 执行状态（011）
-     */
-    protected String operationStatus;
-
-    /**
-     * 操作时间
-     */
-    protected Date operationTime;
-
-    /**
-     * 操作内容
-     */
-    protected String content;
-
-    /**
-     * 扩展信息
-     */
-    protected Map<String, Object> extension = new HashMap<>();
-
-    /**
-     * 操作端授权
-     */
-    protected String appKey;
-
-    /**
-     * 操作端标识
-     */
-    protected String appDeviceId;
-
-    /**
-     * 操作端版本
-     */
-    protected String appVersion;
-
-    /**
-     * 操作端IP
-     */
-    protected String appIp;
-
-    /**
-     * 备注
-     */
-    protected String remarks;
+    private final EventHeader header = new EventHeader();
 
     /**
      * 业务数据类型（即泛型T的全限定名）
@@ -164,284 +62,84 @@ public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent
     protected RemoteEvent() {
         super(TRANSIENT_SOURCE, ORIGIN_FACTORY.getOrigin(null), DEFAULT_DESTINATION_FACTORY.getDestination(null));
         // 子类可以通过反射获取泛型类型
-        Type superClass = getClass().getGenericSuperclass();
-        if (superClass instanceof ParameterizedType) {
-            Type type = ((ParameterizedType) superClass).getActualTypeArguments()[0];
-            this.dataType = type.getTypeName();
-        }
+        this.dataType = resolveDataType();
     }
 
     /**
      * 构造函数
      * @param businessType    业务类型
      * @param operationType   操作类型
-     * @param operationStatus 操作状态
+     * @param operationResult 操作结果
      */
-    public RemoteEvent(@NonNull String businessType, @NonNull String operationType, String operationStatus) {
+    public RemoteEvent(@NonNull String businessType, @NonNull String operationType, String operationResult) {
         // 默认以业务类型为事件主题
-        this(businessType, operationType, operationStatus, null);
+        this(businessType, operationType, operationResult, null);
     }
 
     /**
      * 构造函数
      * @param businessType    业务类型
      * @param operationType   操作类型
-     * @param operationStatus 操作状态
+     * @param operationResult 操作结果
+     * @param businessStatus  业务状态（可为空）
+     */
+    public RemoteEvent(@NonNull String businessType, @NonNull String operationType, String operationResult, String businessStatus) {
+        this(businessType, operationType, operationResult, businessStatus, null);
+    }
+
+    /**
+     * 构造函数
+     * @param businessType    业务类型
+     * @param operationType   操作类型
+     * @param operationResult 操作结果
+     * @param businessStatus  业务状态（可为空）
      * @param destinationService 定向服务名（可为空）
      */
-    public RemoteEvent(@NonNull String businessType, @NonNull String operationType, String operationStatus, String destinationService) {
+    public RemoteEvent(@NonNull String businessType, @NonNull String operationType, String operationResult, String businessStatus, String destinationService) {
         super(TRANSIENT_SOURCE, ORIGIN_FACTORY.getOrigin(null), DEFAULT_DESTINATION_FACTORY.getDestination(StringUtil.isNull(destinationService) ? null : destinationService));
-        // 其他属性
-        this.businessType    = businessType;
-        this.operationType   = operationType;
-        this.operationStatus = operationStatus;
-        this.destination     = destinationService;
+        // 业务类型、操作类型是事件的必填项，构造时即校验（比发布时才发现更容易定位调用方）
+        if (StringUtil.isNull(businessType)) {
+            throw new IllegalArgumentException("businessType must not be empty");
+        }
+        if (StringUtil.isNull(operationType)) {
+            throw new IllegalArgumentException("operationType must not be empty");
+        }
+        // 其他属性（目标服务由父类保存，上面的 super(...) 已确定路由）
+        header.setBusinessType(businessType);
+        header.setOperationType(operationType);
+        header.setOperationResult(operationResult);
+        header.setBusinessStatus(businessStatus);
         // 子类可以通过反射获取泛型类型
+        this.dataType = resolveDataType();
+    }
+
+    /**
+     * 从子类声明的泛型父类（如 {@code extends RemoteEvent<UserInfo>}）解析数据类型名称。
+     */
+    private String resolveDataType() {
         Type superClass = getClass().getGenericSuperclass();
         if (superClass instanceof ParameterizedType) {
             Type type = ((ParameterizedType) superClass).getActualTypeArguments()[0];
-            this.dataType = type.getTypeName();
+            return EventSupport.typeNameOf(type);
         }
+        return null;
     }
 
+    @Override
+    public EventHeader header() {
+        return header;
+    }
+
+    /**
+     * Spring Cloud Bus 自己使用的ID（构造时随机生成，用于 Bus 的 Ack、追踪、equals 等），<b>不是</b>业务的事件ID。
+     * @return Bus 内部ID
+     * @deprecated 业务代码请使用 {@link #getEventId()}：事件消息的唯一标识。
+     *             （保留本方法的覆盖仅为了在误用时给出编译警告，行为与父类一致）
+     */
+    @Deprecated
     @Override
     public String getId() {
-        return id;
-    }
-
-    @Override
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    @Override
-    public boolean isRetry() {
-        return retry;
-    }
-
-    @Override
-    public void setRetry(boolean retry) {
-        this.retry = retry;
-    }
-
-    @Override
-    public String getDestination() {
-        return destination;
-    }
-
-    @Override
-    public void setDestination(String destination) {
-        this.destination = destination;
-    }
-
-    @Override
-    public String getToken() {
-        return token;
-    }
-
-    @Override
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    @Override
-    public String getTraceId() {
-        return traceId;
-    }
-
-    @Override
-    public void setTraceId(String traceId) {
-        this.traceId = traceId;
-    }
-
-    @Override
-    public String getBusinessType() {
-        return businessType;
-    }
-
-    @Override
-    public void setBusinessType(@NonNull String businessType) {
-        this.businessType = businessType;
-    }
-
-    @Override
-    public String getBusinessSubType() {
-        return businessSubType;
-    }
-
-    @Override
-    public void setBusinessSubType(String businessSubType) {
-        this.businessSubType = businessSubType;
-    }
-
-    @Override
-    public String getBusinessTable() {
-        return businessTable;
-    }
-
-    @Override
-    public void setBusinessTable(String businessTable) {
-        this.businessTable = businessTable;
-    }
-
-    @Override
-    public String getBusinessId() {
-        return businessId;
-    }
-
-    @Override
-    public void setBusinessId(String businessId) {
-        this.businessId = businessId;
-    }
-
-    @Override
-    public String getBusinessInstituteId() {
-        return businessInstituteId;
-    }
-
-    @Override
-    public void setBusinessInstituteId(String businessInstituteId) {
-        this.businessInstituteId = businessInstituteId;
-    }
-
-    @Override
-    public String getOperatorId() {
-        return operatorId;
-    }
-
-    @Override
-    public void setOperatorId(String operatorId) {
-        this.operatorId = operatorId;
-    }
-
-    @Override
-    public String getOperatorName() {
-        return operatorName;
-    }
-
-    @Override
-    public void setOperatorName(String operatorName) {
-        this.operatorName = operatorName;
-    }
-
-    @Override
-    public String getOperatorInstituteId() {
-        return operatorInstituteId;
-    }
-
-    @Override
-    public void setOperatorInstituteId(String operatorInstituteId) {
-        this.operatorInstituteId = operatorInstituteId;
-    }
-
-    @Override
-    public String getOperationType() {
-        return operationType;
-    }
-
-    @Override
-    public void setOperationType(@NonNull String operationType) {
-        this.operationType = operationType;
-    }
-
-    @Override
-    public String getOperationStatus() {
-        return operationStatus;
-    }
-
-    @Override
-    public void setOperationStatus(String operationStatus) {
-        this.operationStatus = operationStatus;
-    }
-
-    @Override
-    public Date getOperationTime() {
-        return operationTime;
-    }
-
-    @Override
-    public void setOperationTime(Date operationTime) {
-        this.operationTime = operationTime;
-    }
-
-    @Override
-    public String getContent() {
-        return content;
-    }
-
-    @Override
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    @Override
-    public Map<String, ?> getExtension() {
-        return extension;
-    }
-
-    @Override
-    public void setExtension(Map<String, ?> extension) {
-        if (extension == null) {
-            this.extension = new HashMap<>();
-        } else {
-            this.extension = new HashMap<>(extension);
-        }
-    }
-
-    @Override
-    public <E> void addExtension(String key, E val) {
-        if (this.extension == null) {
-            this.extension = new HashMap<>();
-        }
-        this.extension.put(key, val);
-    }
-
-    @Override
-    public String getAppKey() {
-        return appKey;
-    }
-
-    @Override
-    public void setAppKey(String appKey) {
-        this.appKey = appKey;
-    }
-
-    @Override
-    public String getAppDeviceId() {
-        return appDeviceId;
-    }
-
-    @Override
-    public void setAppDeviceId(String appDeviceId) {
-        this.appDeviceId = appDeviceId;
-    }
-
-    @Override
-    public String getAppVersion() {
-        return appVersion;
-    }
-
-    @Override
-    public void setAppVersion(String appVersion) {
-        this.appVersion = appVersion;
-    }
-
-    @Override
-    public String getAppIp() {
-        return appIp;
-    }
-
-    @Override
-    public void setAppIp(String appIp) {
-        this.appIp = appIp;
-    }
-
-    public String getRemarks() {
-        return remarks;
-    }
-
-    public void setRemarks(String remarks) {
-        this.remarks = remarks;
+        return super.getId();
     }
 
     public String getDataType() {
@@ -477,40 +175,5 @@ public class RemoteEvent<T> extends RemoteApplicationEvent implements UoquoEvent
 
     public void setNewData(T newData) {
         this.newData = newData;
-    }
-
-    /**
-     * 复制事件的基本信息
-     * @param sourceEvent 源事件
-     */
-    public void copy(UoquoEvent sourceEvent) {
-        if (StringUtil.isNull(this.getId())) {
-            this.setId(sourceEvent.getId());
-        }
-        if (StringUtil.isNull(this.getToken())) {
-            this.setToken(sourceEvent.getToken());
-        }
-        if (StringUtil.isNull(this.getTraceId())) {
-            this.setTraceId(sourceEvent.getTraceId());
-        }
-        if (StringUtil.isNull(this.getAppKey())) {
-            this.setAppKey(sourceEvent.getAppKey());
-            this.setAppDeviceId(sourceEvent.getAppDeviceId());
-            this.setAppVersion(sourceEvent.getAppVersion());
-            this.setAppIp(sourceEvent.getAppIp());
-        }
-        if (StringUtil.isNull(this.getOperatorId())) {
-            this.setOperatorId(sourceEvent.getOperatorId());
-            this.setOperatorName(sourceEvent.getOperatorName());
-            this.setOperationTime(sourceEvent.getOperationTime());
-        }
-        if (StringUtil.isNull(this.getOperatorInstituteId())) {
-            this.setOperatorInstituteId(sourceEvent.getOperatorInstituteId());
-        }
-        if (StringUtil.isNull(this.getBusinessId())) {
-            this.setBusinessId(sourceEvent.getBusinessId());
-            this.setBusinessInstituteId(sourceEvent.getBusinessInstituteId());
-            this.setBusinessTable(sourceEvent.getBusinessTable());
-        }
     }
 }
