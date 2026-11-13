@@ -98,6 +98,8 @@ gateway签名 = SignParamUtil.sign(appSign + timestamp, globalSecret)
 | 分布式事务 | Seata XID |
 | 时间戳 | 当前服务器时间 |
 
+无 appkey 的场景（异步任务、定时任务）：以 `app.name` 作为 appkey 和 secret 签名，并写入 appid 请求头。服务就绪后由 `ServiceAppKeyRegister` 将 `APPKEY_SECRET_PREFIX + app.name` 登记到 Redis，被调用方据此取得 secret。
+
 Feign 签名计算：
 ```
 feign签名 = SignParamUtil.sign(appSign + gatewaySign + timestamp, globalSecret)

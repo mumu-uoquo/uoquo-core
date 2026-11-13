@@ -53,6 +53,16 @@ public class CloudConfig {
         return new RemoteEventListenerFactory(serviceMatcher);
     }
 
+    /**
+     * 服务就绪后登记服务名 appkey，用于无用户上下文（异步、定时任务）的 Feign 调用签名.
+     */
+    @Bean
+    @ConditionalOnMissingBean(value = ServiceAppKeyRegister.class, search = SearchStrategy.CURRENT)
+    public ServiceAppKeyRegister serviceAppKeyRegister() {
+        log.debug("加载BEAN：ServiceAppKeyRegister");
+        return new ServiceAppKeyRegister();
+    }
+
     /* ******************* interceptor ******************* */
     @Bean
     @ConditionalOnMissingBean(value = CurrentUserInterceptorAdapter.class, search = SearchStrategy.CURRENT)

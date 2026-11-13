@@ -5,6 +5,7 @@
 
 package com.uoquo.cloud.feign;
 
+import com.uoquo.cloud.ServiceAppKeyRegister;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.json.JsonUtil;
 import com.uoquo.utils.CurrentUser;
@@ -74,12 +75,20 @@ public class FeignHeaderInterceptor implements RequestInterceptor {
         byte[] body = template.body();
         // 参数签名
         String timestamp = Long.toString(Clock.systemUTC().millis());
-        String signParams = SignParamUtil.sign(CurrentUser.getAppkey(), CurrentUser.getAppSecret(), CurrentUser.getToken(),
+        // 当前没有appkey时（异步任务、定时任务等），以当前服务名作为appkey和secret（服务启动后已登记到Redis）
+        String appkey    = CurrentUser.getAppkey();
+        String appSecret = CurrentUser.getAppSecret();
+        boolean useServiceName = StringUtil.isNull(appkey);
+        if (useServiceName) {
+            appkey = ServiceAppKeyRegister.getAppName();
+            appSecret = appkey;
+        }
+        String signParams = SignParamUtil.sign(appkey, appSecret, CurrentUser.getToken(),
                 CurrentUser.getLanguage(), CurrentUser.getNonce(), CurrentUser.getDeviceId(), timestamp, param, body);
         if (signParams != null) {
             template.header(CurrentUser.SIGN_APP, signParams);
         } else {
-            log.error("feign calc params signature error. appid={}, token={}, param={}, body={}", CurrentUser.getAppkey(), CurrentUser.getToken(), param, body);
+            log.error("feign calc params signature error. appid={}, token={}, param={}, body={}", appkey, CurrentUser.getToken(), param, body);
         }
         // 网关签名
         String signGlobal = SignParamUtil.sign(signParams + timestamp, CurrentUser.getGlobalSecret());
@@ -98,6 +107,10 @@ public class FeignHeaderInterceptor implements RequestInterceptor {
         }
         // 当前用户信息传递
         putUserInfo(template);
+        // 使用服务名签名时，被调用方需要通过appid请求头找到对应的secret
+        if (useServiceName && StringUtil.notNull(appkey)) {
+            template.header(CurrentUser.APPID, appkey);
+        }
         template.header(CurrentUser.TIME, timestamp);
         // 分布式事物ID
         String xid = RootContext.getXID();
