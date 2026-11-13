@@ -6,6 +6,7 @@
 package com.uoquo.cloud.feign;
 
 import com.uoquo.cloud.ServiceAppKeyRegister;
+import com.uoquo.utils.IDGenerator;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.json.JsonUtil;
 import com.uoquo.utils.CurrentUser;
@@ -83,8 +84,14 @@ public class FeignHeaderInterceptor implements RequestInterceptor {
             appkey = ServiceAppKeyRegister.getAppName();
             appSecret = appkey;
         }
+        // 没有nonce时（异步任务、定时任务等）临时生成一个，便于跨服务日志追踪
+        String nonce = CurrentUser.getNonce();
+        boolean generatedNonce = StringUtil.isNull(nonce);
+        if (generatedNonce) {
+            nonce = IDGenerator.getNextULID();
+        }
         String signParams = SignParamUtil.sign(appkey, appSecret, CurrentUser.getToken(),
-                CurrentUser.getLanguage(), CurrentUser.getNonce(), CurrentUser.getDeviceId(), timestamp, param, body);
+                CurrentUser.getLanguage(), nonce, CurrentUser.getDeviceId(), timestamp, param, body);
         if (signParams != null) {
             template.header(CurrentUser.SIGN_APP, signParams);
         } else {
@@ -110,6 +117,10 @@ public class FeignHeaderInterceptor implements RequestInterceptor {
         // 使用服务名签名时，被调用方需要通过appid请求头找到对应的secret
         if (useServiceName && StringUtil.notNull(appkey)) {
             template.header(CurrentUser.APPID, appkey);
+        }
+        // 临时生成的nonce需放入请求头，被调用方据此验签并记录日志
+        if (generatedNonce) {
+            template.header(CurrentUser.NONCE, nonce);
         }
         template.header(CurrentUser.TIME, timestamp);
         // 分布式事物ID
