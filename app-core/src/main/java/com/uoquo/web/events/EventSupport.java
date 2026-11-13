@@ -192,6 +192,37 @@ public final class EventSupport {
         return maskToken(text);
     }
 
+    /**
+     * 把事件转换成一行摘要，用于每个监听器都会输出的日志：不做 JSON 序列化，不含业务数据和 token。
+     * 例如：{@code AppEvent{eventId=HM79..., businessType=ORDER, operationType=CREATE, businessId=10086, dataType=com.x.Order}}
+     * @param event    事件对象
+     * @param dataType 事件携带的数据类型名称（可空）
+     * @return 摘要文本
+     */
+    public static String toSummary(Object event, String dataType) {
+        if (event == null) {
+            return "null";
+        }
+        if (!(event instanceof UoquoEvent uoquoEvent)) {
+            return event.getClass().getName();
+        }
+        StringBuilder sb = new StringBuilder(160);
+        sb.append(event.getClass().getSimpleName())
+                .append("{eventId=").append(uoquoEvent.getEventId())
+                .append(", businessType=").append(uoquoEvent.getBusinessType())
+                .append(", operationType=").append(uoquoEvent.getOperationType());
+        if (StringUtil.notNull(uoquoEvent.getBusinessId())) {
+            sb.append(", businessId=").append(uoquoEvent.getBusinessId());
+        }
+        if (uoquoEvent.isRetry()) {
+            sb.append(", retry=true");
+        }
+        if (StringUtil.notNull(dataType)) {
+            sb.append(", dataType=").append(dataType);
+        }
+        return sb.append('}').toString();
+    }
+
     /* ======================== 日志链路标识 ======================== */
 
     /**

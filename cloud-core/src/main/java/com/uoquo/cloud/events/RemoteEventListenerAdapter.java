@@ -51,7 +51,8 @@ public class RemoteEventListenerAdapter extends UoquoEventListenerAdapter {
         if (serviceMatcher != null && event instanceof RemoteEvent<?> remoteEvent) {
             ServiceMatcher matcher = serviceMatcher.getIfAvailable();
             if (matcher != null && !matcher.isForSelf(remoteEvent)) {
-                log.debug("skip remote event which is not for this service. destination: {}, event: {}",
+                // 每个监听方法都会判断一次，只在 TRACE 输出，避免一个事件重复多条
+                log.trace("skip remote event which is not for this service. destination: {}, event: {}",
                         remoteEvent.getDestinationService(), remoteEvent.getEventId());
                 return false;
             }

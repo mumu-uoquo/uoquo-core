@@ -90,10 +90,12 @@ public abstract class UoquoEventListenerAdapter extends ApplicationListenerMetho
      */
     @Override
     public void onApplicationEvent(@NonNull ApplicationEvent event) {
-        // 只记录业务事件：Spring 自身的事件（如 ApplicationReadyEvent）会引用整个应用上下文，序列化它们
-        // 既没有意义，又会因为对象图过深而耗时很长（实测启动阶段每个监听器停顿两分钟以上）
-        if (!isFrameworkEvent(event) && log.isDebugEnabled()) {
-            log.debug("received event: {}", EventSupport.toLogString(event));
+        // 日志量控制：一个事件会进入每个监听方法的这个入口（几个到几十个），因此这里只在 TRACE 级别输出一行摘要，
+        // 不做 JSON 序列化；事件的完整内容在发布时（DefaultUoquoEventPublisher）只输出一次。
+        // 另外 Spring 自身的事件（如 ApplicationReadyEvent）会引用整个应用上下文，序列化它们既没有意义，
+        // 又会因为对象图过深而耗时很长（实测启动阶段每个监听器停顿两分钟以上），所以不记录。
+        if (log.isTraceEnabled() && !isFrameworkEvent(event)) {
+            log.trace("received event: {}, listener: {}", EventSupport.toSummary(event, dataTypeOf(event)), listenerName());
         }
         if (!accepts(event)) {
             return;
@@ -102,15 +104,31 @@ public abstract class UoquoEventListenerAdapter extends ApplicationListenerMetho
             EventData data = dataOf(event);
             if (data != null) {
                 if (!EventSupport.matchesDataType(declaredDataClass, data.dataType(), data.oldData(), data.newData())) {
-                    log.debug("skip event. method: {}; method declared: {}, event actual: {}",
-                            getTargetMethod(), declaredDataClass.getSimpleName(), data.dataType());
+                    log.debug("skip event. listener: {}; declared: {}, actual: {}",
+                            listenerName(), declaredDataClass.getSimpleName(), data.dataType());
                     return;
                 }
-                log.debug("process event. method: {}; method declared: {}, event actual: {}",
-                        getTargetMethod(), declaredDataClass.getSimpleName(), data.dataType());
+                log.trace("process event. listener: {}; declared: {}, actual: {}",
+                        listenerName(), declaredDataClass.getSimpleName(), data.dataType());
             }
         }
         super.onApplicationEvent(event);
+    }
+
+    /**
+     * 监听方法的简短名称（类名.方法名），用于日志。
+     */
+    private String listenerName() {
+        Method method = getTargetMethod();
+        return method.getDeclaringClass().getSimpleName() + "." + method.getName();
+    }
+
+    /**
+     * 事件携带的数据类型名称（用于日志摘要）；不是携带数据的事件类型时返回 null。
+     */
+    private String dataTypeOf(ApplicationEvent event) {
+        EventData data = dataOf(event);
+        return data == null ? null : data.dataType();
     }
 
     @Override
@@ -159,7 +177,12 @@ public abstract class UoquoEventListenerAdapter extends ApplicationListenerMetho
             MDC.put("requestId", requestId);
             EventContext.apply(uoquoEvent);
             if (log.isDebugEnabled()) {
-                log.debug("process event begin. method: {}; data: {}", method, EventSupport.toLogString(event));
+                // 只输出摘要（事件的完整内容在发布时已输出过一次）；需要看完整内容时调到 TRACE
+                String dataType = (event instanceof ApplicationEvent applicationEvent) ? dataTypeOf(applicationEvent) : null;
+                log.debug("process event begin. listener: {}; event: {}", listenerName(), EventSupport.toSummary(event, dataType));
+                if (log.isTraceEnabled()) {
+                    log.trace("process event data: {}", EventSupport.toLogString(event));
+                }
             }
             Object result = super.doInvoke(event);
             // 当前在异步线程执行，原线程已经返回 null 给 processEvent 方法，所以此处需要处理监听方法的返回值（如继续发布事件）

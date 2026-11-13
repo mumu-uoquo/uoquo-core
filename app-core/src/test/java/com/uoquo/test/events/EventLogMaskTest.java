@@ -56,4 +56,26 @@ class EventLogMaskTest {
         assertEquals("{\"token\":\"abcdefghij0123456789***\"}", EventSupport.toLogString("{\"token\":\"abcdefghij0123456789ZZZZ\"}"));
         assertEquals("null", EventSupport.toLogString(null));
     }
+
+    @Test
+    @DisplayName("toSummary：一行摘要，不含 token 和业务数据；非业务事件只输出类名")
+    void summaryHasNoSecretsAndNoData() {
+        AppEvent<String> event = new AppEvent<>("BIZ", "OP", "OK");
+        event.setEventId("e-1");
+        event.setToken("SECRET-TOKEN-VALUE-0001");
+        event.setBusinessId("b-1");
+        event.setRetry(true);
+        event.setNewData("secret-data");
+
+        String summary = EventSupport.toSummary(event, "java.lang.String");
+
+        assertEquals("AppEvent{eventId=e-1, businessType=BIZ, operationType=OP, businessId=b-1, retry=true, dataType=java.lang.String}",
+                summary);
+        assertFalse(summary.contains("SECRET") || summary.contains("secret-data"), summary);
+        // 没有业务ID、没有重发、没有数据类型时省略对应部分
+        assertEquals("AppEvent{eventId=null, businessType=BIZ, operationType=OP}",
+                EventSupport.toSummary(new AppEvent<String>("BIZ", "OP", "OK"), null));
+        assertEquals("null", EventSupport.toSummary(null, null));
+        assertEquals("java.lang.Object", EventSupport.toSummary(new Object(), null));
+    }
 }
