@@ -124,6 +124,15 @@ public class RemoteEventDeserializerAutoConfiguration {
         };
     }
 
+    /**
+     * 启动时创建 Bus 的输出通道，而不是第一次发布事件时才创建（Kafka 不可用等问题在启动阶段就能暴露）。
+     * BeanFactoryPostProcessor 必须是 static 方法，避免所在配置类被提前初始化。
+     */
+    @Bean
+    public static BusOutputBindingPostProcessor busOutputBindingPostProcessor() {
+        return new BusOutputBindingPostProcessor();
+    }
+
     /* ******************* Spring Integration errorChannel handler ******************* */
 
     @Bean
