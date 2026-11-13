@@ -18,7 +18,7 @@ import java.lang.reflect.Method;
  */
 public class RemoteEventListenerFactory implements UoquoEventListenerFactory {
 
-    /** Bus 的服务匹配器（可空：没有启用 Bus 时不按目标服务过滤） */
+    /** Bus 的服务匹配器（可空：为空时不按目标服务过滤；没有启用 Bus 时按本服务名匹配，见 {@link RemoteEventDestination}） */
     private final ObjectProvider<ServiceMatcher> serviceMatcher;
 
     public RemoteEventListenerFactory() {

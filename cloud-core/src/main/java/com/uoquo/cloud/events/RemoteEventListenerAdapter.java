@@ -34,7 +34,11 @@ import java.lang.reflect.Method;
 public class RemoteEventListenerAdapter extends UoquoEventListenerAdapter {
     private static final Logger log = LoggerFactory.getLogger(RemoteEventListenerAdapter.class);
 
-    /** Bus 的服务匹配器（没有启用 Bus 时为空，此时不按目标服务过滤） */
+    /**
+     * Bus 的服务匹配器的提供者。<br>
+     * 为 {@code null}（未接入）时不按目标服务过滤；不为 {@code null} 但没有 ServiceMatcher（没有启用 Bus）时，
+     * 按本服务名/实例ID匹配 {@code destinationService}，见 {@link RemoteEventDestination}。
+     */
     private final ObjectProvider<ServiceMatcher> serviceMatcher;
 
     public RemoteEventListenerAdapter(String beanName, Class<?> targetClass, Method method) {
@@ -50,7 +54,11 @@ public class RemoteEventListenerAdapter extends UoquoEventListenerAdapter {
     protected boolean accepts(@NonNull ApplicationEvent event) {
         if (serviceMatcher != null && event instanceof RemoteEvent<?> remoteEvent) {
             ServiceMatcher matcher = serviceMatcher.getIfAvailable();
-            if (matcher != null && !matcher.isForSelf(remoteEvent)) {
+            // 没有启用 Bus（没有 ServiceMatcher）时，按本服务名/实例ID匹配目标服务
+            boolean forSelf = matcher != null
+                    ? matcher.isForSelf(remoteEvent)
+                    : RemoteEventDestination.isForLocalService(remoteEvent.getDestinationService());
+            if (!forSelf) {
                 // 每个监听方法都会判断一次，只在 TRACE 输出，避免一个事件重复多条
                 log.trace("skip remote event which is not for this service. destination: {}, event: {}",
                         remoteEvent.getDestinationService(), remoteEvent.getEventId());

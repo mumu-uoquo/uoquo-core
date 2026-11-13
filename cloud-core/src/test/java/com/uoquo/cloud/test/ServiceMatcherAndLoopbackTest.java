@@ -240,8 +240,41 @@ class ServiceMatcherAndLoopbackTest {
     }
 
     @Test
-    @DisplayName("没有启用 Bus（没有 ServiceMatcher）时不按目标服务过滤")
-    void withoutBusEverythingIsHandledLocally() {
+    @DisplayName("没有启用 Bus（没有 ServiceMatcher）时，按本服务名匹配目标服务：发给其他服务的事件不处理")
+    void withoutBusEventDirectedToOtherServiceIsNotHandled() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(NoBusConfig.class)) {
+            RecordingListener listener = ctx.getBean(RecordingListener.class);
+
+            ctx.publishEvent(directedEvent("evt-other", "svc-b"));
+            ctx.publishEvent(directedEvent("evt-other2", "svc-b:**"));
+            ctx.publishEvent(directedEvent("evt-all", null));
+
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertEquals(List.of("evt-all"), listener.received));
+            await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(5))
+                    .untilAsserted(() -> assertEquals(List.of("evt-all"), listener.received));
+        }
+    }
+
+    @Test
+    @DisplayName("没有启用 Bus（没有 ServiceMatcher）时：广播、发给本服务的事件正常处理")
+    void withoutBusBroadcastAndSelfDirectedAreHandled() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(NoBusConfig.class)) {
+            RecordingListener listener = ctx.getBean(RecordingListener.class);
+
+            ctx.publishEvent(directedEvent("evt-1", null));
+            ctx.publishEvent(directedEvent("evt-2", "**"));
+            ctx.publishEvent(directedEvent("evt-3", APP_NAME));
+            ctx.publishEvent(directedEvent("evt-4", APP_NAME + ":**"));
+
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                    assertEquals(4, listener.received.size(), "received=" + listener.received));
+        }
+    }
+
+    @Test
+    @DisplayName("没有启用 Bus 时，本服务的标识都取不到则无法判断，事件照常处理")
+    void withoutBusAndWithoutServiceNameEverythingIsHandled() {
+        Config.put("spring.application.name", (String) null);
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(NoBusConfig.class)) {
             RecordingListener listener = ctx.getBean(RecordingListener.class);
 
