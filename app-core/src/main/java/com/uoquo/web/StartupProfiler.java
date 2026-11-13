@@ -196,8 +196,41 @@ public final class StartupProfiler {
             } else {
                 sb.append("[startup] 当前上下文没有使用 BufferingApplicationStartup，无法输出启动步骤\n");
             }
+            appendResources(sb, jvmStart);
             sb.append("[startup] ====== 结束 ======");
             log.info("\n{}", sb);
+        }
+
+        /**
+         * 进程资源：用来区分启动慢是 CPU 密集（JIT、类加载、GC），还是在等待 I/O、网络或杀毒软件扫描。
+         * 进程 CPU 时间远小于“耗时 × 核数”、又远大于耗时，说明多线程并行；CPU 时间远小于耗时，说明大部分时间在等待。
+         */
+        private static void appendResources(StringBuilder sb, long jvmStart) {
+            long wall = Math.max(1, System.currentTimeMillis() - jvmStart);
+            sb.append("[startup] -- 5. 进程资源（区分 CPU 密集，还是在等待 I/O、网络、杀毒扫描）--\n");
+            java.lang.management.OperatingSystemMXBean os = ManagementFactory.getOperatingSystemMXBean();
+            if (os instanceof com.sun.management.OperatingSystemMXBean sun) {
+                long cpuMs = sun.getProcessCpuTime() / 1_000_000L;
+                sb.append(String.format("[startup] 进程 CPU 时间 %d ms，已运行 %d ms，平均占用 %.2f 个核（机器共 %d 个核）%n",
+                        cpuMs, wall, cpuMs / (double) wall, os.getAvailableProcessors()));
+                double load = sun.getCpuLoad();
+                if (load >= 0) {
+                    sb.append(String.format("[startup] 系统整体 CPU 负载（近期）约 %.0f%%（其他进程占用高时，本应用会变慢）%n", load * 100));
+                }
+            }
+            java.lang.management.CompilationMXBean jit = ManagementFactory.getCompilationMXBean();
+            if (jit != null && jit.isCompilationTimeMonitoringSupported()) {
+                sb.append(String.format("[startup] JIT 编译累计耗时 %d ms（多线程并行，可能大于启动耗时）%n", jit.getTotalCompilationTime()));
+            }
+            long gcCount = 0;
+            long gcMs = 0;
+            for (java.lang.management.GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
+                gcCount += Math.max(0, gc.getCollectionCount());
+                gcMs += Math.max(0, gc.getCollectionTime());
+            }
+            sb.append(String.format("[startup] GC %d 次，累计停顿 %d ms%n", gcCount, gcMs));
+            java.lang.management.ClassLoadingMXBean cl = ManagementFactory.getClassLoadingMXBean();
+            sb.append(String.format("[startup] 已加载类 %d 个%n", cl.getTotalLoadedClassCount()));
         }
 
         private static String line(String name, long elapsed, long interval) {

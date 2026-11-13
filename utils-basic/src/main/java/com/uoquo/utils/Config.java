@@ -330,6 +330,14 @@ public class Config {
     }
 
     /**
+     * 获取当前生效的环境（指定的环境；未指定时为按默认顺序找到的第一个存在配置文件的环境）.
+     * @return 环境列表（不可修改），没有可用的环境时为空列表
+     */
+    public static List<String> getActiveProfiles() {
+        return activeProfiles;
+    }
+
+    /**
      * 刷新缓存. <br>
      * 重新读取配置文件，全部解析成功后才整体替换当前配置（刷新过程中，其他线程读取到的始终是完整的配置）；
      * 运行期通过 put 设置的值会保留. 应用编码或节点不合法时抛出{@link IllegalStateException}，当前配置不变.

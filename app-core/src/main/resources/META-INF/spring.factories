@@ -8,3 +8,8 @@ com.uoquo.web.config.WebFilterConfig,\
 com.uoquo.web.config.WebHttpConfig,\
 com.uoquo.web.ServiceConfig,\
 com.uoquo.web.ServiceAutoConfiguration
+
+
+# 启动前自动初始化系统属性（启动类的 main 方法不需要再调用 init()）
+org.springframework.boot.SpringApplicationRunListener=\
+com.uoquo.web.ServiceEnvironmentInitializer

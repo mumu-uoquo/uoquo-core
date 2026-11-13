@@ -5,24 +5,18 @@
 
 package com.uoquo.web;
 
-import com.uoquo.utils.Config;
-import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.ThreadPoolUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.slf4j.event.Level;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 
 import jakarta.annotation.PreDestroy;
 import javax.management.*;
 
-import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Set;
 
 /**
@@ -52,55 +46,6 @@ import java.util.Set;
  */
 public class ServiceApplication implements ApplicationRunner {
     protected static final Logger log = LoggerFactory.getLogger(ServiceApplication.class);
-
-    /**
-     * 初始化配置参数 <br>
-     * 备注：启动类的main第一行应该执行该方法
-     */
-    protected static void init() {
-        // 1. 设置默认日志级别，用于在logback未初始化时的日志输出
-        if (StringUtil.isNull(System.getProperty("app.log.level"))) {
-            System.setProperty("app.log.level", Level.INFO.toString());
-        }
-        // 2. 设置“无头”模式，用于在服务端生成验证码等场景（测试时无明显效果T_T）
-        System.setProperty("java.awt.headless", "true");
-        // 3. 网络过滤相关信息 
-        // 由于HostInfoEnvironmentPostProcessor优先于配置文件，因此需要将网络过滤相关信息放入环境变量中
-        // 参见：https://blog.csdn.net/xichenguan/article/details/76636342
-        System.setProperty("spring.cloud.inetutils.preferred-networks", Config.getString("app.preferred.networks"));
-        // 如果没有指定运行模式，则采用配置文件中指定的模式
-        String activeType = System.getProperty("spring.profiles.active");
-        if (StringUtil.isNull(activeType)) {
-            System.setProperty("spring.profiles.active", Config.getString("app.type", "prod"));
-        }
-        // 4. 设置程序根目录
-        System.setProperty("app.path", Config.APP_PATH);
-        /*
-         * 5. 设置WEB临时目录（每次启动时删除已有的临时文件）.<br>
-         * 注意：必须配置为绝对目录，否则时间长了之后将会出错.<br>
-         * 参考：
-         * <ul>
-         *   <li>https://www.jianshu.com/p/88b04815f043</li>
-         *   <li>https://www.jianshu.com/p/7f9a8b44bd94</li>
-         *   <li>https://www.cnblogs.com/nuccch/p/11546494.html</li>
-         * </ul>
-         */
-        Path tmpDir = Path.of(Config.getString("spring.servlet.multipart.location", Config.APP_PATH + "/temp"))
-                .toAbsolutePath()
-                .normalize();
-        try {
-            Files.createDirectories(tmpDir);
-        } catch (IOException e) {
-            log.warn("创建 WEB 临时目录失败：[{}]", tmpDir.toString(), e);
-        }
-        System.setProperty("spring.servlet.multipart.location", tmpDir.toString());
-
-        // 非开发模式，需要先进行授权校验
-//        if (!"dev".equals(Config.APP_TYPE)) {
-//            log.info("main license");
-//            License.verify();
-//        }
-    }
 
     @Override
     public void run(ApplicationArguments args) throws Exception {

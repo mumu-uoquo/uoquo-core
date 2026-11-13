@@ -11,6 +11,7 @@
 ```
 com.uoquo.web
 ├── ServiceApplication.java              # 应用启动基类
+├── ServiceEnvironmentInitializer.java   # 启动前自动初始化系统属性（spring.factories 注册，无需在 main 中调用）
 ├── ServiceAutoConfiguration.java        # 自动配置（注入各组件）
 ├── ServiceConfig.java                   # 基础配置（OkHttp 连接池等）
 │
