@@ -143,7 +143,7 @@ HTTP 请求
 ### 签名计算规则
 
 ```
-签名 = MD5(appid + token + language + nonce + deviceId + timestamp + 请求参数 + 请求体 + secret)
+签名 = SHA-256(appid + token + language + nonce + deviceId + timestamp + 请求参数 + 请求体 + secret)
 ```
 
 ### 请求头参数
