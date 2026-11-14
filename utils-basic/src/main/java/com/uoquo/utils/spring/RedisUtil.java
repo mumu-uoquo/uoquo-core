@@ -137,7 +137,7 @@ public class RedisUtil {
         if (value == null) { return; }
         value.forEach((val)->{
             if (val != null) {
-                byte[] data = parse2Byte(value, false);
+                byte[] data = parse2Byte(val, false);
                 redisTemplate.opsForSet().add(key, data);
             }
         });
