@@ -22,7 +22,7 @@ public class BaseCacheKey {
     /**
      * 各应用登记的全局免登陆接口前缀（后面加应用名），用于应用重启时清理已经不存在的接口
      */
-    public static final String GLOBAL_PERMISSION_APP_PREFIX = "UOQUO:GLOBAL:UNAUTH:APP:";
+    public static final String GLOBAL_PERMISSION_APP_PREFIX = "UOQUO:GLOBAL:UNAUTH:";
 
     /**
      * 系统所有资源信息
