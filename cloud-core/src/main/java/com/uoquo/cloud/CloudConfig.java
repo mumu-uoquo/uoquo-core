@@ -7,10 +7,12 @@ package com.uoquo.cloud;
 import com.uoquo.cloud.events.RemoteEventListenerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.bus.ServiceMatcher;
+import com.uoquo.cloud.interceptor.CheckLogin4GatewayInterceptor;
 import com.uoquo.cloud.interceptor.CheckParam4GatewayInterceptor;
 import com.uoquo.cloud.interceptor.CurrentUser4GatewayInterceptor;
 import com.uoquo.web.ServiceConfig;
 import com.uoquo.web.events.UoquoEventListenerFactory;
+import com.uoquo.web.interceptor.CheckLoginInterceptor;
 import com.uoquo.web.interceptor.CheckParamInterceptor;
 import com.uoquo.web.interceptor.CurrentUserInterceptorAdapter;
 import org.slf4j.Logger;
@@ -63,6 +65,16 @@ public class CloudConfig {
         return new ServiceAppKeyRegister();
     }
 
+    /**
+     * 服务就绪后，将 {@code @IgnoreAuth} 标注的 URL 登记到 Redis，供网关作为第一层拦截使用.
+     */
+    @Bean
+    @ConditionalOnMissingBean(value = IgnoreAuthRegister.class, search = SearchStrategy.CURRENT)
+    public IgnoreAuthRegister ignoreAuthRegister() {
+        log.debug("加载BEAN：IgnoreAuthRegister");
+        return new IgnoreAuthRegister();
+    }
+
     /* ******************* interceptor ******************* */
     @Bean
     @ConditionalOnMissingBean(value = CurrentUserInterceptorAdapter.class, search = SearchStrategy.CURRENT)
@@ -76,6 +88,13 @@ public class CloudConfig {
     public CheckParamInterceptor checkParamInterceptor() {
         log.debug("加载BEAN：CheckParam4GatewayInterceptor");
         return new CheckParam4GatewayInterceptor();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(value = CheckLoginInterceptor.class, search = SearchStrategy.CURRENT)
+    public CheckLoginInterceptor checkLoginInterceptor() {
+        log.debug("加载BEAN：CheckLogin4GatewayInterceptor");
+        return new CheckLogin4GatewayInterceptor();
     }
 
 //    /* ******************* 默认数据源 ******************* */

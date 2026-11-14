@@ -20,9 +20,9 @@ public class BaseCacheKey {
     public static final String GLOBAL_PERMISSION        = "UOQUO:GLOBAL:UNAUTH";
 
     /**
-     * 全局免签名接口（主要用于下载等接口）
+     * 各应用登记的全局免登陆接口前缀（后面加应用名），用于应用重启时清理已经不存在的接口
      */
-    public static final String GLOBAL_UNSIGNED          = "UOQUO:GLOBAL:UNSIGNED";
+    public static final String GLOBAL_PERMISSION_APP_PREFIX = "UOQUO:GLOBAL:UNAUTH:APP:";
 
     /**
      * 系统所有资源信息

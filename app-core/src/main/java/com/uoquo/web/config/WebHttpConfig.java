@@ -178,7 +178,6 @@ public class WebHttpConfig implements WebMvcConfigurer {
         registry.addInterceptor(checkLoginInterceptor())
                 .addPathPatterns("/**")
                 .excludePathPatterns(excludePaths)
-                .excludePathPatterns("/**/login/**", "/**/login*")
                 .order(-800);
     }
 

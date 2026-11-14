@@ -19,7 +19,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import com.uoquo.annotation.web.IgnoreAuth;
 import com.uoquo.utils.CurrentUser;
 import com.uoquo.utils.IDGenerator;
-import com.uoquo.utils.SignParamUtil;
 import com.uoquo.utils.StringUtil;
 import com.uoquo.utils.json.JsonUtil;
 import com.uoquo.utils.spring.RedisUtil;
@@ -149,26 +148,12 @@ public abstract class CurrentUserInterceptorAdapter  implements HandlerIntercept
             CurrentUser.setClientIp(WebUtil.getClientIp(request));
         }
         // 标记是否为内部微服务 Feign 调用（供序列化器判断是否跳过加解密）
-        CurrentUser.setFeignRequest(isFeignRequest(request));
+        CurrentUser.setFeignRequest(WebUtil.isFeignRequest(request));
 
         // 调试日志
         if (log.isDebugEnabled()) {
             log.debug("解析到的用户信息：{}", JsonUtil.serialize(CurrentUser.getInfo()));
         }
-    }
-
-    /**
-     * 判断是否是内部微服务 Feign 调用.
-     */
-    protected boolean isFeignRequest(HttpServletRequest request) {
-        String feignSign  = request.getHeader(CurrentUser.FEIGN_SIGN);
-        String signGlobal = request.getHeader(CurrentUser.GATEWAY_SIGN);
-        String signParams = WebUtil.getHeader(CurrentUser.SIGN_APP, request);
-        if (StringUtil.notNull(feignSign) && StringUtil.notNull(signGlobal) && StringUtil.notNull(signParams)) {
-            String calcFeignSign = SignParamUtil.sign(signParams + signGlobal, CurrentUser.getGlobalSecret());
-            return feignSign.equalsIgnoreCase(calcFeignSign);
-        }
-        return false;
     }
 
     /**

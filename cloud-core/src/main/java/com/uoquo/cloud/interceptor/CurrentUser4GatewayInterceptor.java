@@ -55,15 +55,9 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
         // 解析用户信息（优先从Redis中获取）
         CurrentUser.UserInfo user = this.getUserInfo4Redis(request);
         if (user == null) {
-            // 全局免签判断
-            boolean unsigned = getIgnoreAuthAnnotation(handler).all();
-            if (!unsigned) {
-                String path = request.getRequestURI();
-                unsigned = RedisUtil.existSetItem(BaseCacheKey.GLOBAL_UNSIGNED, path);
-            }
-            // 免签的或者经过网关签名的请求，才从请求头中获取用户信息
-            // 即：只信任网关放入请求头的用户信息，防止前端私自放入用户信息，绕过登录
-            if (unsigned || this.checkGatewayParams(request)) {
+            // 只有经过网关签名的请求，才从请求头中获取用户信息（包括免签、免登录的接口）
+            // 即：只信任网关放入请求头的用户信息，防止前端私自放入用户信息，或绕过网关直连时伪造用户信息
+            if (this.checkGatewayParams(request)) {
                 log.debug("从Redis中获取用户信息失败，从请求头中获取用户信息.");
                 user = this.getUserInfo4Request(request);
             }
@@ -105,15 +99,6 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
         }
     }
 
-    private Long parseToLong(String val) {
-        try {
-            return Long.parseLong(val);
-        } catch (Exception e) {
-            log.warn("转换字符串[{}]为Long时出错.", val, e);
-            return null;
-        }
-    }
-
     /**
      * 网关签名校验
      */
@@ -127,6 +112,10 @@ public class CurrentUser4GatewayInterceptor extends CurrentUserInterceptorAdapte
         String timestamp = request.getHeader(CurrentUser.GATEWAY_TIME);
         if (StringUtil.isNull(timestamp)) {
             log.warn("网关时间为空.");
+            return false;
+        }
+        if (!WebUtil.isGatewayTimeValid(timestamp)) {
+            log.warn("网关时间不正确或已过期：[{}]", timestamp);
             return false;
         }
         // 客户端签名信息

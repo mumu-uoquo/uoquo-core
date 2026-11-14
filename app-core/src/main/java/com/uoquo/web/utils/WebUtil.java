@@ -127,6 +127,63 @@ public class WebUtil {
         return SignParamUtil.sign(appid, secret, token, language, nonce, deviceId, time, param, out.toByteArray());
     }
 
+    /** 网关时间（gateway-time，网关转发和内部微服务调用共用）的时间窗口（毫秒），默认10秒. */
+    private static final long FEIGN_TIME_MAX_MS = 10 * 1000L;
+
+    /**
+     * 网关时间（请求头 gateway-time，毫秒时间戳）是否在有效时间窗口内（与服务器时间相差不超过10秒）.<br>
+     * 用于防止抓包后的网关签名被永久重放.
+     * @param time 网关时间
+     * @return true 有效，false 为空、格式不正确或已超出时间窗口
+     */
+    public static boolean isGatewayTimeValid(String time) {
+        if (StringUtil.isNull(time)) {
+            return false;
+        }
+        try {
+            long timestamp = Long.parseLong(time.trim());
+            return Math.abs(System.currentTimeMillis() - timestamp) <= FEIGN_TIME_MAX_MS;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 是否是内部微服务 Feign 调用.<br>
+     * 校验内容：
+     * <ol>
+     *   <li>网关签名：{@code gateway-signature} 必须是对"应用签名 + 网关时间"的签名（网关时间不可被替换）；</li>
+     *   <li>网关时间：与服务器时间相差不超过10秒（网关与应用服务器一般在同一网络，时间不应该相差很大），防止抓包后永久重放；</li>
+     *   <li>feign签名：{@code feign-signature} 必须是对"应用签名 + 网关签名"的签名.</li>
+     * </ol>
+     * 注意：必须在 {@code CurrentUser} 中已经设置了全局密钥之后调用.
+     * @param request HttpServletRequest请求对象
+     * @return true 是内部微服务调用，false 不是
+     */
+    public static boolean isFeignRequest(HttpServletRequest request) {
+        // feign 和 gateway 的参数必须是请求头中
+        String feignSign  = request.getHeader(CurrentUser.FEIGN_SIGN);
+        String signGlobal = request.getHeader(CurrentUser.GATEWAY_SIGN);
+        String time       = request.getHeader(CurrentUser.GATEWAY_TIME);
+        // 前端的签名可能在url中
+        String signParams = getHeader(CurrentUser.SIGN_APP, request);
+        if (StringUtil.isNull(feignSign) || StringUtil.isNull(signGlobal)
+                || StringUtil.isNull(time) || StringUtil.isNull(signParams)) {
+            return false;
+        }
+        // 校验时间戳
+        if (!isGatewayTimeValid(time)) {
+            return false;
+        }
+        // 先校验网关签名（微服务模式下，就算不是微服务发起的内部调用，那也会经过网关，所以先校验网关签名）
+        String secret = CurrentUser.getGlobalSecret();
+        if (!signGlobal.equalsIgnoreCase(SignParamUtil.sign(signParams + time, secret))) {
+            return false;
+        }
+        // 再校验feign签名
+        return feignSign.equalsIgnoreCase(SignParamUtil.sign(signParams + signGlobal, secret));
+    }
+
     /**
      * 是否是长连接请求（SSE 或 WebSocket）.<br>
      * <ul>
